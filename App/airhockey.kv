@@ -1,0 +1,1284 @@
+#:import Transition kivy.uix.screenmanager.SlideTransition
+#:import Factory kivy.factory.Factory
+#:import Color kivy.graphics.Color
+#:import Animation kivy.animation.Animation
+
+# Default values ---------------------
+
+#:set backgroundColor (1, 1, 1, 1)
+#:set buttonColor (.85, .85, .85, 1)
+#:set disabledButtonColor (.85, .85, .85, .3)
+#:set disabledTextColor (0, 0, 0, .4)
+#:set buttonIconsColor (.7, .7, .7, 1)
+#:set disabledIconColor (1, 1, 1, .4)
+#:set infoColor (.85, .85, .85, .3)
+#:set infoTextColor (0, 0, 0, .7)
+#:set iconColor (1, 1, 1, .6)
+#:set sectionBackgroundColor (.8, .8, .8, .2)
+
+# ------------------------------------- Root widget --------------------------------------------
+<RootWidget>: # ROOT widget
+	id: rootWidget
+	orientation: 'vertical'
+
+	# Game
+	gameFrequency: 0
+	playing: False
+	paused: False
+	score: [0,0]
+	gameTime: 0
+	gameTimeRemaining: -1
+	maxScore: 0
+	maxTime: 0
+	frequency: 0
+	strategyDescription: ""
+
+	# Camera
+	cameraConnected: False
+	cameraFps: 0
+	detectionFps: 0
+	cameraResolution: [320, 192]
+	colorToDetect: [170,255,255]
+	normalizedColorToDetect: [1,1,1]
+	colorLimits: [[0,0,0], [179,255,255]]
+	whiteBalance: [1.5, 1.5]
+	puckPos: [0,0]
+	puckPixelPos: [0, 0]
+
+	# Startegy
+	desiredPos: [0,0]
+	pixelDesiredPos: [0,0]
+	desiredVel: [0,0]
+
+	# Communication (with motors)
+	controlMode: 1
+	strikerPos: [0,0]
+
+	# Status
+	state: "Idle"
+	currentStatusText: "Idle"
+	showingStatus: False
+	dateString: ""
+	timeString: ""
+
+	# Color theme
+	colorTheme: [0, 0, 0, 1]
+	colorThemeHsv: [0,0,0]
+	
+	BoxLayout:
+		id: mainPanel
+# ------------------------------------- Navigation panel --------------------------------------------
+
+		BoxLayout:
+			id: navigationPanel
+			orientation: 'vertical'
+			size_hint_x: None
+			padding: [10, 20]
+			# spacing: 20
+			width: round(root.height - statusPanel.height)/4		
+			pos: mainPanel.pos
+			
+			NavigationButton:
+				id: playScreenButton
+				iconSource:"icons/play.png"
+				iconXOff: 5
+				on_press: root.changeScreen("playScreen")				
+			NavigationButton:
+				id: settingsScreenButton
+				iconSource:"icons/settings.png"
+				on_press: root.changeScreen("settingsScreen")
+			NavigationButton:
+				id: cameraScreenButton
+				iconSource:"icons/camera.png"
+				on_press: root.changeScreen("cameraScreen")
+			NavigationButton:
+				id: infoScreenButton
+				iconSource:"icons/info.png"
+				on_press: root.changeScreen("infoScreen")
+
+		ScreenManager:
+			id: screenManager
+			pos: mainPanel.pos
+			transition: Transition(direction = "up")
+# ------------------------------------- Play screen --------------------------------------------
+			Screen:
+				id: playScreen
+				name: "playScreen"
+
+				BoxLayout: # Main play screen layout
+					orientation: "vertical"
+					BoxLayout: # Score with timer panel
+						padding: [30, 30, 30, 0]
+
+						ScoreOverview:
+							value: root.score[0]
+							id: human
+							colorTheme: root.colorTheme
+							iconSource: "icons/human2.png"
+
+						AnchorLayout:
+							anchor_x:"center"
+							anchor_y:"top"
+							size_hint: 0.3, 1
+							colonSize: 30
+
+							canvas.before:
+								Color: 
+									rgba: infoColor									
+								Ellipse:
+									size: self.colonSize, self.colonSize
+									pos: self.x + self.width/2 - self.colonSize/2, self.y + self.height*.15
+
+								Ellipse:
+									size: self.colonSize, self.colonSize
+									pos: self.x + self.width/2 - self.colonSize/2, self.y + self.height*.45
+
+							CircularInfoRange:	
+								id: time
+								size_hint_y: None
+								height: self.parent.width
+								colorTheme: root.colorTheme
+								font_size: self.height*0.3	
+								text: "{:02d}:{:02d}".format(root.gameTime//60 if root.gameTimeRemaining == -1 else root.gameTimeRemaining//60, root.gameTime%60 if root.gameTimeRemaining == -1 else root.gameTimeRemaining%60)
+								portion: (root.gameTime%60)/60 if root.gameTimeRemaining == -1 else root.gameTimeRemaining / root.settings.game["maxTime"]
+
+						ScoreOverview:
+							value: root.score[1]
+							id: ai
+							colorTheme: root.colorTheme
+							iconSource: "icons/android.png"
+
+
+					AnchorLayout: # play/pause/stop buttons
+						# padding: [(self.width - 1*self.spacing - 2*self.height)/2 , 0]
+						anchor_x: "center"
+						anchor_y: "center"
+						size_hint: 1, None
+						height: 160
+						padding: [0,40,0,40]
+
+						GridLayout: 
+							spacing: 40
+							cols: 3
+							size_hint_x: None
+							width: self.minimum_width
+							RoundedButton:
+								size_hint_x: None
+								width: self.height * 2
+								iconXOff: 4
+								iconSource: "icons/play.png"
+								disabled: root.playing
+								on_release: 
+									root.game.start()	
+									root.showStatus("Game started")
+
+							RoundedButton:
+								size_hint_x: None
+								width: self.height * 2
+								iconSize: 0.4
+								iconSource: "icons/pause.png"
+								disabled: root.paused or not root.playing
+								on_release: 
+									root.game.pause()
+									root.showStatus("Game paused")
+
+							RoundedButton:
+								size_hint_x: None
+								width: self.height * 2
+								iconSize: 0.4
+								iconSource: "icons/stop.png"
+								disabled: not root.playing and not root.paused
+								on_release: 
+									root.game.stop()
+									root.showStatus("Game stopped")
+
+# ------------------------------------- Settings screen --------------------------------------------
+			Screen:
+				id: settingsScreen
+				name: "settingsScreen"
+				BoxLayout:
+					# padding: 10	
+					orientation: "vertical"	
+
+					BoxLayout: # button above settings screens	
+						id: settingsNavigationPanel		
+						size_hint_y: None
+						height: 70
+						transition: 0
+						padding: [15, 10, 15, 10 - 10*self.transition]
+						spacing: 15
+
+						RoundedButton:				
+							posHint: 0
+							pos_hint: {"x": 1, "y": self.posHint}		
+							backgroundColor: sectionBackgroundColor					
+							id: gameSettingsScreenButton
+							text: "Game"
+							on_release: root.changeSettingsScreen("gameSettingsScreen")
+
+						RoundedButton:
+							posHint: 0
+							pos_hint: {"x": 1, "y": self.posHint}	
+							backgroundColor: sectionBackgroundColor					
+							id: cameraSettingsScreenButton
+							text: "Camera"
+							on_release: root.changeSettingsScreen("cameraSettingsScreen")
+
+						RoundedButton:
+							posHint: 0
+							pos_hint: {"x": 1, "y": self.posHint}	
+							backgroundColor: sectionBackgroundColor					
+							id: motorsSettingsScreenButton
+							text: "Motors"
+							on_release: root.changeSettingsScreen("motorsSettingsScreen")
+
+						RoundedButton:
+							posHint: 0
+							pos_hint: {"x": 1, "y": self.posHint}	
+							backgroundColor: sectionBackgroundColor					
+							id: otherSettingsScreenButton
+							text: "Other"
+							on_release: root.changeSettingsScreen("otherSettingsScreen")
+
+					ScreenManager:
+						id: settingsScreenManager
+						transition: Transition(direction = "left")
+					# ------------------------------------- Game screen --------------------------------------------
+						SettingScreen:
+							id: gameSettingsScreen
+							name: "gameSettingsScreen"												
+
+							BoxLayout: # limits / aditional setting divider 
+								orientation: "vertical"
+								padding: 30
+								spacing: 30
+								# ------------------------------------- Game limits setting --------------------------------------------
+								BoxLayout: # goal limit /time limit divider
+									size_hint_y: .9
+									orientation: "horizontal"
+									padding: [50, 0]
+									spacing: 50
+
+									SettingsSection: # goal limit layout
+										orientation: "vertical"
+										spacing: 20
+										padding: 30
+										roundMagnitude: .3
+										BoxLayout: # label/toggle divider
+											
+											spacing: 20
+											padding: [20, 0]
+											Label:
+												text: "Goal Limit:"
+												font_size: self.height * .6
+											ToggleEditor:
+												id: goalLimitToggle
+												width: self.height*2
+												colorTheme: root.colorTheme
+												isDown: root.settings.game['applyMaxScore']
+												parameter: "game['applyMaxScore']"
+												on_isDown: 
+													exec("timeLimitToggle.isDown = True") if not self.isDown and not timeLimitToggle.isDown else None
+													exec('root.settings.' + timeLimitToggle.parameter + ' = timeLimitToggle.isDown')
+
+										ArrowEditor:
+											size_hint_y: 1.5
+											iconColor: root.colorTheme
+											textMagnitude: .4
+											text: "{}".format(root.maxScore)
+											limits: [1, 20]
+											parameter: "game['maxScore']"
+
+									SettingsSection: # time limit layout
+										orientation: "vertical"
+										spacing: 20
+										padding: 30
+										roundMagnitude: .3
+										BoxLayout: # label/toggle divider
+											spacing: 20
+											padding: [20, 0]
+											Label:
+												text: "Time Limit:"
+												font_size: self.height * .6
+											ToggleEditor:
+												id: timeLimitToggle
+												width: self.height*2
+												colorTheme: root.colorTheme
+												isDown: root.settings.game['applyMaxTime']
+												parameter: "game['applyMaxTime']"
+												on_isDown: 
+													exec("goalLimitToggle.isDown = True") if not self.isDown and not goalLimitToggle.isDown else lambda *args: None
+													exec('root.settings.' + goalLimitToggle.parameter + ' = goalLimitToggle.isDown')
+
+										SliderEditor:
+											size_hint_y: 1.5
+											text: "{:02d}:{:02d}".format(root.maxTime//60, root.maxTime%60)
+											limits: [30, 600]
+											value: root.settings.game['maxTime']
+											step: 30
+											parameter: "game['maxTime']"
+											colorTheme: root.colorTheme
+
+								# ------------------------------------- Difficulty settings --------------------------------------------
+								
+								BoxLayout:
+									# size_hint_x: .9
+									# pos_hint: {"center_x": .5, "center_y": 1 }
+									orientation: "vertical"
+									# padding: 20
+									spacing: 30
+									roundMagnitude: .3
+									BoxLayout: # Difficulty selection
+										size_hint: .7, .5
+										pos_hint: {"center_x": .5, "center_y": 1 }
+										spacing: 10
+										SettingsLabel:
+											text: "Difficulty"
+											font_size: self.height*.4
+										RoundedDropDown: 
+											id: difficultyDropdown
+											size_hint_x: 3
+											dir: -1
+											index: root.settings.game["difficulty"]
+											values: "Custom", "All Play and No Work (Easy)", "Challenge Accepted (Normal)", "Blood and Broken Bones (Hard)"
+											on_text: 
+												root.changeDifficulty(self.values.index(self.text))
+												
+									BoxLayout: 
+										spacing: 30
+										GridLayout: # other options
+											cols:2
+											row:2
+											spacing: 15
+											SettingsLabel:
+												text: "Computing frequency"
+											SliderEditor:
+												id: frequencySlider
+												size_hint_x: 2
+												text: "{} Hz".format(root.frequency)
+												limits: [50, 500]
+												value: root.settings.game['frequency']
+												step: 10
+												parameter: "game['frequency']"
+												colorTheme: root.colorTheme
+												onValue: lambda x: exec("difficultyDropdown.text = 'Custom'")
+
+											SettingsLabel:
+												text: "Robot speed"
+											RoundedDropDown: 
+												size_hint_x: 2
+												id: robotSpeedDropdown
+												index: root.settings.game["robotSpeed"]
+												values: "Custom", "Super Slow", "Super Normal", "Super Fast"
+												on_text: 
+													difficultyDropdown.text = "Custom"
+													root.settings.game["robotSpeed"] = self.values.index(self.text)
+
+
+										BoxLayout:
+											spacing: 15
+											orientation: "vertical"
+											BoxLayout:
+												spacing: 10
+												SettingsLabel:
+													text: "Strategy"
+												RoundedDropDown: 
+													id: strategyDropdown
+													size_hint_x: 3
+													index: root.settings.game["strategy"]
+													values: "Strategy A", "Strategy B", "Strategy C", "Strategy D"
+													on_text: 
+														difficultyDropdown.text = "Custom"
+														root.settings.game["strategy"] = self.values.index(self.text)
+														root.game.setStrategy()
+											SettingsLabel:
+												text: root.strategyDescription
+												halign: "center"
+
+					# ------------------------------------- Camera screen --------------------------------------------
+						SettingScreen:
+							id: cameraSettingsScreen
+							name: "cameraSettingsScreen"
+										
+							GridLayout: # Settings / Camera divider
+								rows: 2
+								cols: 2
+								spacing: 30
+								padding: 30
+
+								BoxLayout: # Detection
+									spacing: 10
+									BoxLayout: # Lower limits
+										orientation: "vertical"
+										spacing: 5
+
+										SettingsLabel: 
+											size_hint_y: 1.2
+											text: "Detection lower limits"
+
+										SliderEditor:
+											id: lowerH
+											text: "H {:3d}".format(root.colorLimits[0][0])
+											limits: [0, 179]
+											value: root.settings.camera['lowerLimits'].tolist()[0]
+											step: 1
+											parameter: 'camera["lowerLimits"][0]'
+											onValue: 
+												lambda x: root.updateDetectedColor()
+											colorTheme: root.colorTheme
+										SliderEditor:
+											id: lowerS
+											text: "S {:3d}".format(root.colorLimits[0][1])
+											limits: [0, 255]
+											value: root.settings.camera['lowerLimits'].tolist()[1]
+											step: 1
+											parameter: 'camera["lowerLimits"][1]'
+											onValue: 
+												lambda x: exec('upperS.value = x if x > upperS.currentValue else upperS.currentValue')
+											colorTheme: root.colorTheme
+										SliderEditor:
+											id: lowerV
+											text: "V {:3d}".format(root.colorLimits[0][2])
+											limits: [0, 255]
+											value: root.settings.camera['lowerLimits'].tolist()[2]
+											step: 1
+											parameter: 'camera["lowerLimits"][2]'
+											onValue: 
+												lambda x: exec('upperV.value = x if x > upperV.currentValue else upperV.currentValue')
+											colorTheme: root.colorTheme
+
+									BoxLayout: # Upper limits
+										orientation: "vertical"
+										spacing: 5
+
+										SettingsLabel: 
+											size_hint_y: 1.2
+											text: "Detection upper limits"
+
+										SliderEditor:
+											id: upperH
+											text: "H {:3d}".format(root.colorLimits[1][0])
+											limits: [0, 179]
+											value: root.settings.camera['upperLimits'].tolist()[0]
+											step: 1
+											parameter: 'camera["upperLimits"][0]'
+											onValue: 
+												lambda x: root.updateDetectedColor()
+											colorTheme: root.colorTheme
+										SliderEditor:
+											id: upperS
+											text: "S {:3d}".format(root.colorLimits[1][1])
+											limits: [0, 255]
+											value: root.settings.camera['upperLimits'].tolist()[1]
+											step: 1
+											parameter: 'camera["upperLimits"][1]'
+											onValue: 
+												lambda x: exec('lowerS.value = x if x < lowerS.currentValue else lowerS.currentValue')
+											colorTheme: root.colorTheme
+										SliderEditor:
+											id: upperV
+											text: "V {:3d}".format(root.colorLimits[1][2])
+											limits: [0, 255]
+											value: root.settings.camera['upperLimits'].tolist()[2]
+											step: 1
+											parameter: 'camera["upperLimits"][2]'
+											onValue: 
+												lambda x: exec('lowerV.value = x if x < lowerV.currentValue else lowerV.currentValue')
+											colorTheme: root.colorTheme
+
+								SettingsSection: # Frame mask
+									size_hint_x: .5
+									BoxLayout:
+										orientation: "vertical"
+										Label: 
+											text: "Frame mask"
+											size_hint_y: .3
+										Image:
+											id: maskSettingsStream
+											allow_stretch: root.cameraConnected
+											keep_ratio: not root.cameraConnected
+											source: "icons/no-video.png"
+
+								BoxLayout:
+								
+
+								SettingsSection: # Frame
+									size_hint_x: .5
+									BoxLayout:
+										orientation: "vertical"
+										Label: 
+											text: "Frame"
+											size_hint_y: .3
+										Image:
+											id: frameSettingsStream
+											allow_stretch: root.cameraConnected
+											keep_ratio: not root.cameraConnected
+											source: "icons/no-video.png"
+
+
+					# ------------------------------------- Motors screen --------------------------------------------
+						SettingScreen:
+							id: motorsSettingsScreen
+							name: "motorsSettingsScreen"
+							
+					# ------------------------------------- Others screen --------------------------------------------
+						SettingScreen:
+							id: otherSettingsScreen
+							name: "otherSettingsScreen"	
+
+							
+# ------------------------------------- Camera screen --------------------------------------------
+			Screen:
+				id: cameraScreen
+				name: 'cameraScreen'				
+				BoxLayout:
+					padding: [10, 30]
+					spacing: 20
+					BoxLayout: # Info tuples next to imgage view
+						orientation: "vertical"
+						size_hint_x: None
+						width: 200
+						spacing: 30
+
+						BoxLayout:
+							orientation: "vertical" 
+							spacing: 10
+
+							InfoTuple:
+								title: "Resolution"
+								value: "{}x{}".format(*root.cameraResolution) 
+							InfoTuple:
+								title: "White balance"
+								value: "R {:.2f}\nB {:.2f}".format(*root.whiteBalance) 
+							InfoTuple:
+								title: "Camera"
+								value: "{} fps".format(round(root.cameraFps))
+							InfoTuple:
+								title: "Detection"
+								value: "{} fps".format(root.detectionFps) 
+							InfoTuple:
+								title: "Color"
+								value: "({:3},{:3},{:3})".format(*root.colorToDetect) 
+								valueSize: self.height*.35
+							InfoTuple:
+								title: "Intervals"
+								value: "L ({:3},{:3},{:3})\nH ({:3},{:3},{:3})".format(*root.colorLimits[0], *root.colorLimits[1]) 
+								valueSize: self.height*.3
+
+						BoxLayout:
+							size_hint_y: .6
+							orientation: "vertical"
+							spacing: 10
+							InfoTuple:
+								title: "Puck\npos"
+								value: "x: {:4d}\ny: {:4}".format(*root.puckPos) 
+								valueSize: self.height*.33
+								titleSize: self.height*.33
+							InfoTuple:
+								title: "Striker\npos"
+								value: "x: {:4d}\ny: {:4}".format(*root.strikerPos) 
+								valueSize: self.height*.33
+								titleSize: self.height*.33
+							InfoTuple:
+								title: "Desired\npos"
+								value: "x: {:4d}\ny: {:4}".format(*root.desiredPos) 
+								valueSize: self.height*.33
+								titleSize: self.height*.33
+						
+					BoxLayout: # Image view with buttons
+						# padding: 10
+						spacing: 10
+						orientation: 'vertical'
+
+						BoxLayout: # Buttons above image view
+							# padding: [0, 10]
+							spacing: 10
+							# size_hint: 1, None
+							# height: 60
+							RoundedButton: 
+								text: "Calibrate WB"
+								disabled: not root.state == "Idle"
+								on_release: app.root.camera.startLockingAwb(lambda results: app.root.openPopup("Camera", results))
+							RoundedButton: 
+								text: "Analyze color"
+								disabled: not root.state == "Idle"
+								on_release: app.root.camera.startAnalyzing(lambda results: app.root.openPopup("Camera", results))
+							RoundedSwitchButton: 
+								text: "Calibrate field"
+								disabled: not root.state == "Idle" and not self.isDown
+								on_release: 
+									cameraStream.calibratingField = self.isDown
+									if not self.isDown: root.settings.saveSettings()
+						StencilView: # Image view
+							size_hint_y: 8
+							ImageViewer:
+								id: cameraStream
+								
+								showing: "Frame"
+
+								puckRad: 20		
+								puckPos: [0,0]		
+								desiredPos: [0,0]		
+								strikerPos: [0,0]		
+								fieldCorners: (0,0,0,0,0,0,0,0)
+								calibratingField: False
+								calibratingGain: .2
+								closestCorner: -1
+
+								pos: self.parent.pos
+								size: self.parent.size
+								allow_stretch: root.cameraConnected
+								keep_ratio: not root.cameraConnected
+								source: "icons/no-video.png"
+							
+								canvas.after:
+									# Draw field ----------------
+									Color:
+										rgba: [0,1,0,1]
+									Line:
+										points: self.fieldCorners
+										width: 2
+										close: True
+
+									# Draw puck ----------------s
+									Color:
+										hsv: [root.normalizedColorToDetect[0],1,1]
+									Line:
+										circle: [self.puckPos[0], self.puckPos[1], self.puckRad]
+										width: 2
+
+									# Draw desired position ----------------s
+									Color:
+										rgb: [1,0,0]
+									Line:
+										circle: [self.desiredPos[0], self.desiredPos[1], 5]
+										width: 5
+
+									# Draw striker position ----------------s
+									Color:
+										rgb: [0,0,1]
+									Line:
+										circle: [self.strikerPos[0], self.strikerPos[1], 5]
+										width: 5
+										
+									# Color:
+									# 	rgba: Color(root.normalizedColorToDetect[0], 1, 1, mode='hsv').rgba						
+									# Ellipse:
+									# 	pos: [self.puckPos[0] - self.puckRad, self.puckPos[1] - self.puckRad]
+									# 	size: [self.puckRad*2, self.puckRad*2]
+									
+									# Draw detected color ----------------
+									Color:
+										hsv: root.normalizedColorToDetect
+									Ellipse:
+										pos: [self.x + self.width - 50, self.y + 20]
+										size: [30, 30]
+
+									# Draw calibrating field
+									Color:
+										rgba: [0,1,0,.1] if self.calibratingField else [0,0,0,0]
+									Ellipse:
+										pos: [self.fieldCorners[0] - self.parent.height/2, self.fieldCorners[1] - self.parent.height/2]
+										size: [self.parent.height, self.parent.height]
+									Ellipse:
+										pos: [self.fieldCorners[2] - self.parent.height/2, self.fieldCorners[3] - self.parent.height/2]
+										size: [self.parent.height, self.parent.height]
+									Ellipse:
+										pos: [self.fieldCorners[4] - self.parent.height/2, self.fieldCorners[5] - self.parent.height/2]
+										size: [self.parent.height, self.parent.height]
+									Ellipse:
+										pos: [self.fieldCorners[6] - self.parent.height/2, self.fieldCorners[7] - self.parent.height/2]
+										size: [self.parent.height, self.parent.height]
+
+						BoxLayout: # Buttons below image view
+							# padding: [0, 10]
+							spacing: 10
+							# size_hint: 1, None
+							# height: 70
+							RoundedButton: 
+								text: "Start Cam"
+								disabled: not root.state == "Idle"
+								on_release: root.initializeCamera()
+							RoundedButton: 
+								text: "Stop Cam"
+								disabled: not root.state == "Idle"
+								on_release: root.camera.stopCamera()
+							RoundedDropDown: 
+								size_hint_x: 2
+								values: "Frame", "Mask", "Filtered mask"
+								on_text: 
+									cameraStream.showing = self.text
+								# text: "Stop Cam"
+								# on_release: root.dropDown.open
+
+# ------------------------------------- Info screen --------------------------------------------
+			Screen:		
+				id: infoScreen
+				name: "infoScreen"
+				Label:
+					text: self.parent.name
+
+# ------------------------------------- Status panel --------------------------------------------
+
+	BoxLayout: # Status panel
+		id: statusPanel
+		size_hint_y: .08
+		# height: 40
+
+		BoxLayout:
+			padding: 5
+			spacing: 5
+			InfoTuple:
+				title: "Cam"
+				value: "{:.0f} fps".format(root.cameraFps) 
+			InfoTuple:
+				title: "Det"
+				value: "{:.0f} fps".format(root.detectionFps) 
+			InfoTuple:
+				title: "Freq"
+				value: "{:.0f} Hz".format(root.gameFrequency) 
+
+		BoxLayout:
+			padding: 5
+			SettingsLabel:
+				textMagnitude: .4
+				size_hint: 1.3, 1
+				text: root.currentStatusText
+
+		BoxLayout:
+			size_hint_x: .9
+			padding: 5
+			InfoTuple:
+				title: root.dateString
+				value: root.timeString
+
+
+
+
+
+# ------------------------------------- Others --------------------------------------------
+# AirHockey canvases
+<RoundedButtonLook@Widget>:
+	iconSource: ""
+	roundMagnitude: 1
+	iconColor: iconColor
+	iconSize: 0.45
+	iconXOff: 0
+	iconYOff: 0
+	roundedCorners: [1,1,1,1]
+	backgroundColor: [0,0,0,0]
+	alpha: 1
+
+	canvas.before:
+		Color:
+			rgba: self.backgroundColor
+		RoundedRectangle:
+			pos: self.pos
+			size: self.size
+			radius: [max(isRounded,0)* min(self.size[0]/2, self.size[1]/2) * self.roundMagnitude for isRounded in self.roundedCorners]
+		Color:
+			rgba: (disabledButtonColor if self.disabled else buttonColor[:3] + (max(self.alpha, 0),)) if self.state == 'normal' else app.root.colorTheme
+		RoundedRectangle:
+			pos: self.pos
+			size: self.size
+			radius: [max(isRounded,0) * min(self.size[0]/2, self.size[1]/2) * self.roundMagnitude for isRounded in self.roundedCorners]
+		Color:
+			rgba: [1,1,1,0] if root.iconSource == "" else (disabledIconColor if self.disabled else self.iconColor if self.iconColor is not None else iconColor)
+		Rectangle:
+			pos: [root.center_x - (root.size[1] * root.iconSize)/2 + root.iconXOff,  root.center_y - (root.size[1] * root.iconSize)/2 + root.iconYOff]
+			size: [(root.size[1] * root.iconSize), (root.size[1] * root.iconSize)]
+			source: root.iconSource
+
+<RoundedLook>:
+	background_normal: ""
+	background_color: [0, 0, 0, 0]
+
+	roundMagnitude: 1
+	backgroundColor: [1,1,1,1]
+	roundedCorners: [1,1,1,1]
+
+	canvas.before:
+		Color:
+			rgba: self.backgroundColor 
+		RoundedRectangle:
+			pos: self.pos
+			size: self.size
+			radius: [max(isRounded,0) * min(self.size[0]/2, self.size[1]/2) * self.roundMagnitude for isRounded in self.roundedCorners]
+# Custom buttons --------------------------------------------------------			
+<RoundedSwitchButton@ToggleButton+RoundedButtonLook>:
+	background_color: [0, 0, 0, 0]
+	disabled_color: disabledTextColor
+	font_size: self.height *.4
+	background_normal: ""
+	background_disabled_normal: ''
+	isDown: not self.state == 'normal'
+	canvas.before:
+		Color:
+			rgba: buttonIconsColor if self.state == 'normal' else buttonColor
+		Ellipse:
+			pos: [self.x + self.height/2 - self.height/10, self.y + self.height/2 - self.height/10]
+			size: [self.height/5, self.height/5]
+
+<RoundedButton@Button+RoundedButtonLook>:	
+	background_color: [0, 0, 0, 0]
+	disabled_color: disabledTextColor
+	font_size: self.height *.4
+	background_normal: ""
+	background_disabled_normal: ''
+
+<NavigationButton@Button>:
+	background_color: [0, 0, 0, 0]
+	disabled_color: disabledTextColor
+	background_normal: ""
+	background_disabled_normal: ''
+	iconSource: ""
+	iconSize: 0.45
+	iconXOff: 0
+	iconYOff: 0
+
+	sizeGain: 0.8
+
+	canvas.before:
+		Color:
+			rgba: buttonColor
+		Ellipse:
+			size: [root.size[1] * root.sizeGain, root.size[1] * root.sizeGain]
+			pos: [root.center_x - root.size[1]*root.sizeGain/2,  root.center_y - root.size[1]*root.sizeGain/2]
+
+		Color:
+			rgba: [1,1,1,0] if root.iconSource == "" else iconColor
+		Rectangle:
+			size: [(root.size[1] * root.iconSize) * root.sizeGain, (root.size[1] * root.iconSize) * root.sizeGain]
+			pos: [root.center_x - (root.size[1] * root.iconSize) * root.sizeGain/2 + root.iconXOff,  root.center_y - (root.size[1] * root.iconSize) * root.sizeGain/2 + root.iconYOff]
+			source: root.iconSource
+# Info tuple ------------------------------------------------------------
+<InfoTuple@BoxLayout>:
+	title: ""
+	value: ""
+	titleSize: self.height*.4
+	valueSize: self.height*.4
+	spacing: self.height*.1
+	padding: [self.height/6, 0]
+	canvas.before:
+		Color:
+			rgba: infoColor
+		RoundedRectangle:
+			pos: self.pos
+			size: self.size
+			radius: [min(self.size[0]/2, self.size[1]/2),]
+		Color:
+			rgba: [1,1,1,1]
+		Line:
+			points: (self.x + self.width/2, self.y, self.x + self.width/2, self.y + self.height)
+			width: 1
+
+	Label:
+		font_size: root.titleSize
+		color: infoTextColor
+		text_size: self.size
+		halign: "center"
+		valign: "center"
+		text: root.title	
+
+	Label:
+		font_size: root.valueSize
+		color: infoTextColor
+		text_size: self.size
+		halign: "center"
+		valign: "center"
+		text: root.value
+
+# Drop down -------------------------------------------------------------
+<MySpinnerOption@SpinnerOption>:
+    background_color: [0, 0, 0, 0]
+	background_normal: ""
+	canvas.before:
+		Color:
+			rgba: buttonColor
+		RoundedRectangle:
+			pos: [self.x + 1, self.y + 1]
+			size: [self.width - 2, self.height - 2]
+			radius: [min(self.size[0]/2, self.size[1]/2),]
+ 
+<RoundedDropDown@Spinner+RoundedButtonLook>:
+	dir: 1
+	index: 0
+	values: ['Item' + str(i) for i in range(20)]
+	text: self.values[self.index]
+	font_size: self.height * .4
+	option_cls: Factory.get("MySpinnerOption")
+	
+	on_index: self.text = self.values[self.index]
+	on_text: lambda x: print(x)
+	setIndex: lambda x: exec("self.text = self.values[x]")
+
+	background_color: [0, 0, 0, 0]
+	background_normal: ""
+	canvas.before:
+		Color:
+			rgba: buttonIconsColor if self.state == 'normal' else buttonColor
+		Line:
+			points: 
+				(self.x + self.height/2 - self.dir * self.height/10, self.y + self.height/2 - self.dir * self.height/20,
+				self.x + self.height/2, self.y + self.height/2 + self.dir * self.height/20,
+				self.x + self.height/2 + self.dir * self.height/10, self.y + self.height/2 - self.dir * self.height/20)
+			width: 2
+
+
+# Circular Info Range ---------------------------------------------------
+<CircularInfoRange@Label>:
+	text: ""
+	font_size: self.height*.6
+	colorTheme: [1, 1, 1, 1]
+	portion: 1
+
+	canvas.before:
+		Color:
+			rgba: infoColor
+		Ellipse:
+			pos: self.pos
+			size: self.size	
+		
+		Color:
+            rgba: [0,0,0,0] if self.portion == 0 else self.colorTheme
+        Line:
+            circle:self.center_x, self.center_y, root.height/2 - root.height/35 - 1, 0, 360*root.portion
+            width: root.height/35 + 1
+
+# Centered icon ---------------------------------------------------------
+<Icon@BoxLayout>:
+	source: ""
+	AnchorLayout:
+		anchor_x: "center"
+		anchor_y: "center"
+		Image:
+			allow_stretch: True
+			size_hint: None, None
+			width: min(self.parent.width, self.parent.height)
+			height: min(self.parent.width, self.parent.height)
+			source: root.source
+
+
+	
+# Popup windows ----------------------------------------------------------
+<WinnerPopup>: # Popup for winner screen
+	size_hint: .7, .7
+	background: "white.png"
+	title_color: 0, 0, 0, 0
+	title: ""
+	separator_height: 0
+
+	# Defined upon opening
+	text: "default"
+
+	BoxLayout:
+
+		orientation: "vertical"		
+		FloatLayout:
+			size_hint_y: 0
+			Image:
+				size_hint: None, None
+				source: "icons/celebrate.gif"
+				allow_stretch: True
+				keep_ratio: False
+				pos: root.pos
+				size: root.size
+
+		AnchorLayout:
+			padding: [50, 0]
+			Label:			
+				markup: True
+				halign: "center"
+				valign: "center"
+				text_size: self.size
+				font_size: self.height*0.4
+				text: root.text
+				
+		AnchorLayout:
+			anchor_x: "center"
+			anchor_y: "center"
+			size_hint_y: None
+			height: 70
+			padding: [0, 10]
+			GridLayout:
+				spacing: root.width*0.1
+				cols: 2	
+				size_hint_x: None
+				width: self.minimum_width
+				RoundedButton:
+					size_hint_x: None
+					width: root.width*0.2
+					text: "Dismiss"
+					on_press: root.dismiss()
+				RoundedButton:
+					size_hint_x: None
+					width: root.width*0.2
+					text: "Play again"
+					on_press: 
+						root.dismiss()
+						app.root.game.start()
+					
+
+	
+
+<CustomPopup>: # Custom popup
+    auto_dismiss: True
+	size_hint: .5, .5
+	background: "white.png"
+	title_color: 0, 0, 0, 1
+	separator_height: 1
+	title_align: "center"
+
+	# Defined upon opening
+	onPress: lambda x: print("nothing")
+	title: "default"
+	text: "default"
+	buttonText: "default"
+	separator_color: [0,0,0,0.5]
+
+	BoxLayout:
+		orientation: "vertical"		
+		AnchorLayout:
+			padding: [50, 0]
+			Label:			
+				markup: True
+				halign: "center"
+				valign: "center"
+				text_size: self.size
+				text: root.text
+				id: lbl
+		AnchorLayout:
+			anchor_x: "center"
+			anchor_y: "center"
+			size_hint_y: None
+			height: 60
+			padding: [0, 10]
+			RoundedButton:
+				size_hint_x: None
+				width: len(root.buttonText) * 20
+				text: root.buttonText
+				id: btn
+				on_press: 
+					root.onPress("")
+					root.dismiss()
+
+   
+# Editors ---------------------------------------------------------------
+<ArrowEditor@BoxLayout>:
+	parameter: ""
+	step: 1
+	limits: [0, 99999999]
+	text: ""
+	textMagnitude: 0.4
+	value: 0
+	iconColor: [1,1,1,.3] 
+	RoundedButton:
+		id: decrement
+		size_hint_x: None
+		width: root.height
+		iconSource: "icons/decrement.png"
+		iconColor: root.iconColor
+		iconSize: .3
+		roundedCorners: [1,0,0,1]
+		on_release: 
+			increment.disabled = False
+			exec('app.root.settings.' + root.parameter + ' -= root.step')
+			exec('if app.root.settings.' + root.parameter + ' < ' + str(root.limits[0]) + ': app.root.settings.' + root.parameter + ' = ' + str(root.limits[0]))
+			self.disabled = eval('True if app.root.settings.' + root.parameter + ' == ' + str(root.limits[0]) + ' else False')
+	Label:
+		size_hint_x: None
+		width: root.width - root.height * 2
+		text: root.text
+		font_size: self.height * root.textMagnitude
+		canvas.before:
+			Color:
+				rgba: infoColor
+			Rectangle:
+				pos: self.pos
+				size: self.size
+
+	RoundedButton:
+		id: increment
+		size_hint_x: None
+		width: root.height
+		iconSource: "icons/increment.png"
+		iconColor: root.iconColor
+		iconSize: .3
+		roundedCorners: [0,1,1,0]
+		on_release: 
+			decrement.disabled = False
+			exec('app.root.settings.' + root.parameter + ' += root.step')
+			exec('if app.root.settings.' + root.parameter + ' > ' + str(root.limits[1]) + ': app.root.settings.' + root.parameter + ' = ' + str(root.limits[1]))
+			self.disabled = eval('True if app.root.settings.' + root.parameter + ' == ' + str(root.limits[1]) + ' else False')
+
+<-AirHockeySlider@Slider>:
+<ToggleEditor@ToggleButton+RoundedLook>:
+	size_hint_x: None
+	width: self.height*2.5
+
+	isDown: False
+	onRelease: lambda x: print(x)
+
+	parameter: ""
+
+	colorTheme: [1,1,1,1]
+	backgroundColor: self.colorTheme if self.isDown else infoColor
+
+	transition: 1 if self.isDown else 0
+	switchWidth: .6
+
+	on_release:
+		self.onRelease("")
+		self.isDown = not self.isDown
+		self.transition = 1 if self.isDown else 0
+		self.backgroundColor = self.colorTheme if self.isDown else infoColor
+		exec('app.root.settings.' + root.parameter + ' = self.isDown')
+
+	canvas.before:
+		Color:
+			rgba: disabledButtonColor if self.disabled else buttonColor
+
+		RoundedRectangle:
+			size: self.width*self.switchWidth, self.height
+			pos: self.pos if self.transition is None else (self.x + self.transition*self.width*(1 - self.switchWidth), self.y)
+			radius: [self.height/2,]
+
+<SliderEditor>:
+	value: 0
+	currentValue: 0
+	rounding: 0
+	limits: [0, 10000]
+	step: 1
+	parameter: ""
+	text: ""
+	isDown: False
+	disabled: False
+	onValue: lambda x: None
+
+	on_value: 		
+		slider.value = self.value
+
+	colorTheme: [0,0,0,0]
+	backgroundColor: infoColor
+	
+
+	AirHockeySlider:
+		id: slider
+		value: root.value
+		min: root.limits[0]
+		max: root.limits[1]
+		step: root.step
+		disabled: root.disabled
+
+		padding: self.height*.8
+
+		on_value: 
+			root.onValue(self.value)
+			None if root.parameter == "" else exec('app.root.settings.' + root.parameter + ' = self.value')
+			root.currentValue = self.value
+		
+		canvas.before:
+			Color:
+				rgba: root.colorTheme
+			Line:
+				points: self.x + self.height/2, self.center_y, self.x + self.width - self.height/2, self.center_y		
+				width: 2
+			Color:
+				rgba: disabledButtonColor if self.disabled else buttonColor
+
+			RoundedRectangle:
+				pos: self.value_pos[0] - slider.height*.8, self.value_pos[1]
+				size: slider.height*1.6, slider.height
+				radius: [slider.height/2,]
+
+			Color:
+				rgba: buttonColor[:3] + (.85,) if root.isDown else [0,0,0,0]
+
+			RoundedRectangle:
+				size: slider.height*2, slider.height*1.3
+				pos: self.value_pos[0] - self.height*0.8 - slider.height * .2, self.value_pos[1] + self.height*1.3
+				radius: [slider.height*1.3/2,]
+
+
+		Label:
+			pos: (slider.value_pos[0] - slider.height/2, slider.value_pos[1])
+			size_hint: None, None
+			size: slider.height, slider.height
+			font_size: slider.height*.4
+			text: str(round(slider.value)) if root.text == "" else root.text
+
+		Label:
+			pos: (slider.value_pos[0] - slider.height/2, slider.value_pos[1] + slider.height*1.3)
+			size_hint: None, None
+			size: slider.height, slider.height*1.3
+			font_size: slider.height*.5
+			text: str(round(slider.value)) if root.text == "" else root.text if root.isDown else ""
+
+
+
+# Sections --------------------------------------------------------------
+<SettingsSection@BoxLayout+RoundedLook>
+	backgroundColor: sectionBackgroundColor
+	roundMagnitude: .3
+<SettingScreen@Screen+RoundedLook>:
+	backgroundColor: sectionBackgroundColor
+	roundMagnitude: .1
+
+# Score overview --------------------------------------------------------
+<ScoreOverview@BoxLayout>:
+	orientation: "vertical"
+	value: 0
+	portion: 0
+	iconSource: ""
+	spacing: 20
+	colorTheme: [1,1,1,1]
+	Icon:		
+		padding: 0
+		size_hint_y: 0.3
+		source: root.iconSource
+	AnchorLayout:
+		anchor_x: "center"
+		anchor_y: "center"
+		CircularInfoRange:
+			size_hint_x: None
+			width: self.height			
+			colorTheme: root.colorTheme
+			text: str(root.value)
+			portion: root.portion
+
+# Settings tuple --------------------------------------------------------
+<SettingsTuple@BoxLayout>:
+	spacing: 20
+	text: ""
+	textMagnitude: 0.4
+	Label:
+		text_size: self.size
+		halign: "right"
+		valign: "center"
+		text: root.text
+		font_size: self.height*root.textMagnitude
+
+<SettingsLabel@Label+RoundedLook>:
+	textMagnitude: 0.33
+	text_size: [self.width * 0.8, self.height * .8]
+	halign: "center"
+	valign: "center"
+	font_size: self.height*root.textMagnitude
+	backgroundColor: infoColor
+
+
+# Overwriting defaults --------------------------------------------------
+<Label>:
+	color: [0, 0, 0, 1]
+	# FloatLayout:
+	# 	Icon:
+	# 		source: root.iconSource
+	# 		pos: [root.center_x - root.size[1]*root.sizeGain/2,  root.center_y - root.size[1]*root.sizeGain/2]
+	# 		size_hint: None, None
+	# 		size: [root.size[1] * root.sizeGain, root.size[1] * root.sizeGain]
+
+		# Color:
+		# 	rgba: [1, 0, 0, 1]
+		# Line:
+        #     width: 2
+        #     rectangle: self.x, self.y, self.width, self.height

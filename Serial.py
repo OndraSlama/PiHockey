@@ -4,10 +4,11 @@ from HelperClasses import FPSCounter
 from threading import Thread
 
 class Serial():
-	def __init__(self):
+	def __init__(self, settings):
+		self.settings = settings
 		# Reading ----
 		self.vector = [0,0]
-		self.command = None
+		self.status = None
 
 		self._readingLine = ""
 		self._writingLine = "ahoj"
@@ -23,16 +24,16 @@ class Serial():
 		self._lastRead = 0
 		self._lastWrite = 0
 
-	def readCommand(self):
-		output = self.command
-		self.command = None
-		return output		
+	def readStatus(self):
+		output = self.status
+		self.status = None
+		return output	
 
 	def writeLine(self, txt):
 		self._writingLine = txt
 	
 	def writeVector(self, vector, mode):
-		self.writeLine("{},{}".format(*vector))
+		self.writeLine("{},{}".format(*[*vector].copy()))
 
 	def _reading(self):
 		while True:
@@ -45,7 +46,7 @@ class Serial():
 			except:
 				print("Error while decoding")
 				
-			sleepTime = 1/500 - (time.time() - self._lastRead)
+			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastRead)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -56,12 +57,12 @@ class Serial():
 		while True:
 			self._lastWrite = time.time()
 
-			if not self._writingLine == self._prevWrite:
+			if not self._writingLine == self._prevWrite and not self._writingLine == "":
 				self._writingCounter.tick()
 				self._prevWrite = self._writingLine			
 				self._ser.write((str(self._writingLine) + '\n').encode('ascii'))
 
-			sleepTime = 1/500 - (time.time() - self._lastWrite)
+			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWrite)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -70,7 +71,7 @@ class Serial():
 
 	def _parseReading(self, txt):
 		if txt == "e1" or txt == "e2" or txt == "e3": 
-			self.command = txt
+			self.status = txt
 		else:
 			try:
 				parse = [round(float(x)) for x in txt.split(",")][:2]

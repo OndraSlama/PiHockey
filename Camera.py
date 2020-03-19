@@ -115,8 +115,8 @@ class Camera():
 				rg -= referencePixel[2]/500
 				bg -= referencePixel[0]/500
 				
-				self.camera.awb_gains = (max(min(rg, 8), 0), max(min(bg, 8), 0))
-				self.settings["whiteBalance"] = (max(min(rg, 8), 0), max(min(bg, 8), 0))
+				self.settings["whiteBalance"] = [max(min(rg, 8), 0), max(min(bg, 8), 0)]
+				self.setWhiteBalance()
 				self.frame = cv2.bitwise_and(self.frame, self.frame, mask=mask)
 
 				# cv2.imshow("Calibrating", self.frame)
@@ -408,6 +408,11 @@ class Camera():
 		self.newPosition = False
 		return self.unitFilteredPuckPosition
 
+	def setWhiteBalance(self):
+		if self.camera is not None:
+			self.camera.awb_gains = (self.settings["whiteBalance"][0], self.settings["whiteBalance"][1])
+
+
 	def _isPuckInField(self, pos):
 		if not (0 < pos.x < FIELD_WIDTH):
 			return False
@@ -462,10 +467,11 @@ class Camera():
 		else:
 			return Vector2(int(vector[0]), int(vector[1]))	
 		
-	def _createTransformMatrices(self, source):
-		if self.prevFieldCorners is None or not (np.all(self.prevFieldCorners == source)):
+	def _createTransformMatrices(self, fieldCorners):
+		if self.prevFieldCorners is None or not (np.all(self.prevFieldCorners == fieldCorners)):
 			# print("Calculating transform matrices.")
-			self.prevFieldCorners = source.copy()
+			self.prevFieldCorners = fieldCorners.copy()
+			source = np.float32([[point[0] * self.settings["resolution"][0], point[1] * self.settings["resolution"][1]] for point in self.settings["fieldCorners"].tolist()])
 			dst = np.float32([[0, FIELD_HEIGHT/2], [FIELD_WIDTH, FIELD_HEIGHT/2], [FIELD_WIDTH, -FIELD_HEIGHT/2], [0, -FIELD_HEIGHT/2]])
 			dst = np.array([dst])
 

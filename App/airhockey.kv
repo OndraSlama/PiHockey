@@ -36,6 +36,8 @@
 	# Camera
 	cameraConnected: False
 	cameraFps: 0
+	setCameraFps: 0
+	minPuckRad: 0
 	detectionFps: 0
 	cameraResolution: [320, 192]
 	colorToDetect: [170,255,255]
@@ -50,9 +52,21 @@
 	pixelDesiredPos: [0,0]
 	desiredVel: [0,0]
 
-	# Communication (with motors)
+	# Motors
 	controlMode: 1
 	strikerPos: [0,0]
+	motorStatus: ""
+	homed: True
+	writingLine: ""
+	readingLine: ""
+	comFrequency: 0
+	setVelocity: 0
+	setAcceleration: 0
+	setPGain: 0
+	desiredPos: [0,0]
+	desiredVel: [0,0]
+	desiredMot: [0,0]
+
 
 	# Status
 	state: "Idle"
@@ -146,7 +160,7 @@
 							value: root.score[1]
 							id: ai
 							colorTheme: root.colorTheme
-							iconSource: "icons/android.png"
+							iconSource: "icons/monitor.png"
 
 
 					AnchorLayout: # play/pause/stop buttons
@@ -167,7 +181,7 @@
 								width: self.height * 2
 								iconXOff: 4
 								iconSource: "icons/play.png"
-								disabled: root.playing
+								disabled: root.playing or not root.homed
 								on_release: 
 									root.game.start()	
 									root.showStatus("Game started")
@@ -237,13 +251,14 @@
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
 							id: otherSettingsScreenButton
-							text: "Other"
+							text: "Control"
+							disabled: not root.homed
 							on_release: root.changeSettingsScreen("otherSettingsScreen")
 
 					ScreenManager:
 						id: settingsScreenManager
 						transition: Transition(direction = "left")
-					# ------------------------------------- Game screen --------------------------------------------
+			# ------------------------------------- Game screen --------------------------------------------
 						SettingScreen:
 							id: gameSettingsScreen
 							name: "gameSettingsScreen"												
@@ -371,6 +386,7 @@
 												index: root.settings.game["robotSpeed"]
 												values: "Custom", "Super Slow", "Super Normal", "Super Fast"
 												on_text: 
+													root.changeSpeed(self.values.index(self.text))
 													difficultyDropdown.text = "Custom"
 													root.settings.game["robotSpeed"] = self.values.index(self.text)
 
@@ -395,7 +411,7 @@
 												text: root.strategyDescription
 												halign: "center"
 
-					# ------------------------------------- Camera screen --------------------------------------------
+			# ------------------------------------- Camera screen --------------------------------------------
 						SettingScreen:
 							id: cameraSettingsScreen
 							name: "cameraSettingsScreen"
@@ -410,10 +426,11 @@
 									spacing: 10
 									BoxLayout: # Lower limits
 										orientation: "vertical"
-										spacing: 5
+										spacing: 10
 
 										SettingsLabel: 
-											size_hint_y: 1.2
+											size_hint_y: 1
+											textMagnitude: .4
 											text: "Detection lower limits"
 
 										SliderEditor:
@@ -449,10 +466,11 @@
 
 									BoxLayout: # Upper limits
 										orientation: "vertical"
-										spacing: 5
+										spacing: 10
 
 										SettingsLabel: 
-											size_hint_y: 1.2
+											size_hint_y: 1
+											textMagnitude: .4
 											text: "Detection upper limits"
 
 										SliderEditor:
@@ -499,8 +517,79 @@
 											keep_ratio: not root.cameraConnected
 											source: "icons/no-video.png"
 
-								BoxLayout:
-								
+								BoxLayout: # Other camera setting
+									# padding: 0, 20
+									spacing: 10
+									orientation: "vertical"		
+									BoxLayout: #Resolution
+										spacing: 10
+										SettingsLabel:
+											size_hint_x: .7
+											text: "Resolution"
+											textMagnitude: .4
+										SliderEditor:
+											text: "{:3d}x{:3d}".format(*root.cameraResolution)
+											limits: [1, 6]
+											value: round(root.settings.camera['resolution'][0] / 80)
+											step: .2
+											on_currentValue: root.showStatus("Camera resolution will be changed after restart.")
+											onValue: 
+												lambda x: exec('app.root.settings.camera["resolution"] = [round(80 * x), round(48 * x)]')
+											colorTheme: root.colorTheme
+
+									BoxLayout: #Fps
+										spacing: 10
+										SettingsLabel:
+											size_hint_x: .7
+											text: "Framerate"
+											textMagnitude: .4
+										SliderEditor:
+											text: "{:3d} fps".format(root.setCameraFps)
+											limits: [20, 90]
+											value: root.settings.camera['fps']
+											step: 10
+											on_currentValue: root.showStatus("Camera fps will be changed after restart.")
+											parameter: 'camera["fps"]'
+											colorTheme: root.colorTheme
+
+										
+									BoxLayout: # Min puck radius
+										spacing: 10
+
+										SettingsLabel:
+											size_hint_x: .7
+											text: "Min Puck Radius"
+											textMagnitude: .4
+										SliderEditor:
+											text: "{:2.0f}".format(root.minPuckRad)
+											limits: [0, 20]
+											step: 1
+											parameter: 'camera["limitPuckRadius"]'
+											colorTheme: root.colorTheme	
+
+									BoxLayout: # White balance
+										spacing: 10
+										SettingsLabel:
+											size_hint_x: .65
+											text: "White Balance"
+											textMagnitude: .4
+										SliderEditor:
+											text: "R {:.2f}".format(root.whiteBalance[0])
+											limits: [0, 3]
+											step: .02
+											parameter: 'camera["whiteBalance"][0]'
+											onValue: 
+												lambda x: exec('app.root.camera.setWhiteBalance()')
+											colorTheme: root.colorTheme
+										SliderEditor:
+											text: "B {:.2f}".format(root.whiteBalance[1])
+											limits: [0, 3]
+											step: .02
+											parameter: 'camera["whiteBalance"][1]'
+											onValue: 
+												lambda x: exec('app.root.camera.setWhiteBalance()')
+											colorTheme: root.colorTheme
+									# BoxLayout:								
 
 								SettingsSection: # Frame
 									size_hint_x: .5
@@ -516,15 +605,205 @@
 											source: "icons/no-video.png"
 
 
-					# ------------------------------------- Motors screen --------------------------------------------
+			# ------------------------------------- Motors screen --------------------------------------------
 						SettingScreen:
 							id: motorsSettingsScreen
 							name: "motorsSettingsScreen"
+
+							BoxLayout: # main screen
+								padding: 30
+								spacing: 30
+
+								BoxLayout: # Control elements
+									spacing: 30
+									orientation: "vertical"
+									BoxLayout: # Communication
+										# size_hint_y: .65
+
+										BoxLayout:
+											orientation: "vertical"
+											spacing: 10
+											BoxLayout:
+												spacing: 10
+												InfoTuple:
+													size_hint_x: 1.35
+													title: "Last Read"
+													value: root.readingLine
+												InfoTuple:
+													title: "Vector"
+													value: "{:3d},{:3d}".format(*root.strikerPos)
+												InfoTuple:
+													title: "Status"
+													value: root.motorStatus
+											BoxLayout:
+												spacing: 10
+												InfoTuple:
+													# size_hint_x: 1.35
+													title: "Last Write"
+													value: root.writingLine
+												# InfoTuple:
+												# 	title: "Cmd"
+												# 	value: "Home"
+												InfoTuple:
+													title: "Control mode"
+													value: str(root.controlMode)
+											BoxLayout:
+												# size_hint_y: 1.1
+												spacing: 10
+												SettingsLabel:
+													size_hint_x: .65
+													text: "Serial Frequency"
+													textMagnitude: .4
+												SliderEditor:
+													text: "{:3d} Hz".format(root.comFrequency)
+													limits: [100, 600]
+													value: root.settings.motors['communicationFrequency']
+													step: 50
+													parameter: 'motors["communicationFrequency"]'
+													colorTheme: root.colorTheme
+
+									BoxLayout: # Motors
+										BoxLayout:
+											orientation: "vertical"
+											spacing: 10
+											BoxLayout:
+												spacing: 10
+												SettingsLabel:
+													size_hint_x: .65
+													text: "Max velocity"
+													textMagnitude: .4
+												SliderEditor:
+													id: velocitySlider
+													# textMagnitude: .37
+													text: "{:1.2f}m/s".format(root.setVelocity * 0.075 / 1000)
+													limits: [1000, 16000]
+													value: root.settings.motors['velocity']
+													step: 200
+													parameter: 'motors["velocity"]'
+													on_currentValue:
+														exec("robotSpeedDropdown.text = 'Custom'")
+														root.serial.writeLine("setmaxspeed,"+str(self.value))
+													colorTheme: root.colorTheme
+
+											BoxLayout:
+												spacing: 10
+												SettingsLabel:
+													size_hint_x: .65
+													text: "Acceleration"
+													textMagnitude: .4
+												SliderEditor:
+													id: accelerationSlider
+													# textMagnitude: .37
+													text: "{:3.0f}".format(root.setAcceleration)
+													limits: [20, 300]
+													value: root.settings.motors['acceleration']
+													step: 20
+													parameter: 'motors["acceleration"]'
+													on_currentValue:
+														exec("robotSpeedDropdown.text = 'Custom'")
+														root.serial.writeLine("setaccel,"+str(self.value))
+													colorTheme: root.colorTheme
+
+											BoxLayout:
+												spacing: 10
+												SettingsLabel:
+													size_hint_x: .65
+													text: "P Gain"
+													textMagnitude: .4
+												SliderEditor:
+													id: pGainSlider
+													# textMagnitude: .37
+													text: "{:3.0f}".format(root.setPGain)
+													limits: [80, 160]
+													value: root.settings.motors['pGain']
+													step: 5
+													parameter: 'motors["pGain"]'
+													on_currentValue:
+														exec("robotSpeedDropdown.text = 'Custom'")
+														root.serial.writeLine("kpgain,"+str(self.value))
+													colorTheme: root.colorTheme
+									BoxLayout:
+										size_hint_y: .4
+										spacing: 10
+										RoundedButton:
+											text: "Test"
+											disabled: not root.homed
+											on_release:
+												app.root.testMotors()
+										RoundedButton:
+											text: "Home"
+											on_release:
+												app.root.serial.writeLine("home")
+
+									
+								Image: 
+									id: field
+									size_hint_x: None
+									width: self.height * (800/1296)
+									pos_hint: {"center_x": .5, "center_y": .5}
+
+									source: "images/bg.png"
+
+									pusherY: root.strikerPos[0]
+									pusherX: root.strikerPos[1]
+						
+									Image: 
+										id: slider
+										width: field.width * 799/885
+										height: self.width * 232/2222
+
+										x: field.x + (field.width - self.width)/2
+										y: field.y + (field.height * 1165/1296 - self.height*0.4) - (field.pusherY/1000) * 1034/1296 * field.height#(field.height - self.height)/2
+										source: "images/slider.png"								
+
+									Image:
+										id: striker
+										width: slider.height * 110/83
+										height: self.width
+
+										x: field.x + field.width/2 - self.width/2 + (field.pusherX/300) * 621/800 * field.width/2#(slider.width - self.width)/2
+										y: slider.y + (slider.height - self.height)*0.7
+										source: "images/pusher.png"
+								
+										
+
+
 							
-					# ------------------------------------- Others screen --------------------------------------------
+			# ------------------------------------- Control screen --------------------------------------------
 						SettingScreen:
 							id: otherSettingsScreen
 							name: "otherSettingsScreen"	
+							# BoxLayout:
+							ControlField: 
+								id: controlField
+								size_hint_x: None
+								width: self.height * (1296/800)
+								# center: self.parent.center
+								pos_hint: {"center_x": .5, "center_y": .5}
+
+								source: "images/bg_landscape.png"
+
+								pusherX: root.strikerPos[0]
+								pusherY: root.strikerPos[1]
+
+						
+								Image: 
+									id: controlSlider
+									height: controlField.height * 799/885
+									width: self.height * 232/2222
+									x: controlField.x + (controlField.width * 1165/1296 - self.width*0.42) - (controlField.pusherX/1000) * 1034/1296 * controlField.width
+									y: controlField.y + (controlField.height - self.height)/2
+									source: "images/slider_landscape.png"	
+						
+								Image:
+									id: controlStriker
+									width: controlSlider.width * 110/83
+									height: self.width
+
+									x: controlSlider.x + (controlSlider.width - self.width)*0.68
+									y: controlSlider.y +  controlField.height/2 - self.height/2 + (controlField.pusherY/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									source: "images/pusher_landscape.png"
+
 
 							
 # ------------------------------------- Camera screen --------------------------------------------
@@ -597,15 +876,15 @@
 							# height: 60
 							RoundedButton: 
 								text: "Calibrate WB"
-								disabled: not root.state == "Idle"
+								disabled: not root.state == "Idle" and not root.state == "Homing required!"
 								on_release: app.root.camera.startLockingAwb(lambda results: app.root.openPopup("Camera", results))
 							RoundedButton: 
 								text: "Analyze color"
-								disabled: not root.state == "Idle"
+								disabled: not root.state == "Idle" and not root.state == "Homing required!"
 								on_release: app.root.camera.startAnalyzing(lambda results: app.root.openPopup("Camera", results))
 							RoundedSwitchButton: 
 								text: "Calibrate field"
-								disabled: not root.state == "Idle" and not self.isDown
+								disabled: (not root.state == "Idle" and not root.state == "Homing required!") and not self.isDown
 								on_release: 
 									cameraStream.calibratingField = self.isDown
 									if not self.isDown: root.settings.saveSettings()
@@ -697,11 +976,11 @@
 							# height: 70
 							RoundedButton: 
 								text: "Start Cam"
-								disabled: not root.state == "Idle"
+								disabled: not root.state == "Idle" and not root.state == "Homing required!"
 								on_release: root.initializeCamera()
 							RoundedButton: 
 								text: "Stop Cam"
-								disabled: not root.state == "Idle"
+								disabled: not root.state == "Idle" and not root.state == "Homing required!"
 								on_release: root.camera.stopCamera()
 							RoundedDropDown: 
 								size_hint_x: 2
@@ -1144,12 +1423,14 @@
 			radius: [self.height/2,]
 
 <SliderEditor>:
-	value: 0
+	value: float(0.0)
 	currentValue: 0
-	rounding: 0
+	textMagnitude: .4
+	sliderMagnitude: 1.2
 	limits: [0, 10000]
-	step: 1
+	step: .01
 	parameter: ""
+	valueGain: 1
 	text: ""
 	isDown: False
 	disabled: False
@@ -1164,17 +1445,16 @@
 
 	AirHockeySlider:
 		id: slider
+		step: root.step
 		value: root.value
 		min: root.limits[0]
 		max: root.limits[1]
-		step: root.step
 		disabled: root.disabled
-
-		padding: self.height*.8
+		padding: self.height*1.6*root.sliderMagnitude/2
 
 		on_value: 
+			None if root.parameter == "" else exec('app.root.settings.' + root.parameter + ' = self.value*'+str(root.valueGain))
 			root.onValue(self.value)
-			None if root.parameter == "" else exec('app.root.settings.' + root.parameter + ' = self.value')
 			root.currentValue = self.value
 		
 		canvas.before:
@@ -1187,16 +1467,16 @@
 				rgba: disabledButtonColor if self.disabled else buttonColor
 
 			RoundedRectangle:
-				pos: self.value_pos[0] - slider.height*.8, self.value_pos[1]
-				size: slider.height*1.6, slider.height
+				pos: self.value_pos[0] - self.height*1.6*root.sliderMagnitude/2, self.value_pos[1]
+				size: self.height*1.6*root.sliderMagnitude, slider.height
 				radius: [slider.height/2,]
 
 			Color:
 				rgba: buttonColor[:3] + (.85,) if root.isDown else [0,0,0,0]
 
 			RoundedRectangle:
-				size: slider.height*2, slider.height*1.3
-				pos: self.value_pos[0] - self.height*0.8 - slider.height * .2, self.value_pos[1] + self.height*1.3
+				size: slider.height*2 * root.sliderMagnitude, slider.height*1.3
+				pos: self.value_pos[0] - self.height*root.sliderMagnitude, self.value_pos[1] + self.height*1.3
 				radius: [slider.height*1.3/2,]
 
 
@@ -1204,14 +1484,14 @@
 			pos: (slider.value_pos[0] - slider.height/2, slider.value_pos[1])
 			size_hint: None, None
 			size: slider.height, slider.height
-			font_size: slider.height*.4
+			font_size: slider.height*root.textMagnitude
 			text: str(round(slider.value)) if root.text == "" else root.text
 
 		Label:
 			pos: (slider.value_pos[0] - slider.height/2, slider.value_pos[1] + slider.height*1.3)
 			size_hint: None, None
 			size: slider.height, slider.height*1.3
-			font_size: slider.height*.5
+			font_size: slider.height*root.textMagnitude * 1.2
 			text: str(round(slider.value)) if root.text == "" else root.text if root.isDown else ""
 
 

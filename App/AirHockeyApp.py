@@ -27,6 +27,7 @@ import numpy as np
 import cv2
 from datetime import datetime
 from random import randint
+from functools import partial
 
 import os
 os.environ['KIVY_GL_BACKEND'] = 'gl'
@@ -54,7 +55,7 @@ class SliderEditor(BoxLayout,RoundedLook):
 
 	def updateValue(self, *args):
 		if not self.parameter == "":
-			exec('self.value = int(App.get_running_app().root.settings.' + self.parameter +')')
+			exec('self.value = float(App.get_running_app().root.settings.' + self.parameter +')*1/'+ str(self.valueGain))
 
 	def on_touch_move(self, touch):
 		if self.collide_point(touch.x, touch.y):
@@ -63,6 +64,8 @@ class SliderEditor(BoxLayout,RoundedLook):
 	def on_touch_up(self, touch):
 		self.isDown = False
 
+class ControlField(Image):
+	pass
 
 class ImageViewer(Image):
 	def on_touch_down(self, touch):
@@ -87,7 +90,7 @@ class ImageViewer(Image):
 			i = self.closestCorner
 
 			distVector = [touch.x - self.relativeReferencePoint[0], touch.y - self.relativeReferencePoint[1]]
-			setCorners[i] = [self.absoluteReferencePoint[0] + distVector[0]*self.calibratingGain, self.absoluteReferencePoint[1] + distVector[1]*self.calibratingGain]
+			setCorners[i] = [self.absoluteReferencePoint[0] + distVector[0]*self.calibratingGain/app.root.settings.camera["resolution"][0], self.absoluteReferencePoint[1] + distVector[1]*self.calibratingGain/app.root.settings.camera["resolution"][1]]
 			# print(self.absoluteReferencePoint)
 
 class CustomPopup(Popup):
@@ -101,15 +104,14 @@ class RootWidget(BoxLayout):
 	settings = Settings('AirHockey_settings.obj')
 	camera = Camera(settings.camera)
 	game = Game(camera, settings.game)
-	serial = Serial()
+	serial = Serial(settings.motors)
 	
 
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
 		self.changeScreen("settingsScreen") # Initial screen
-		self.changeSettingsScreen("cameraSettingsScreen")
-
+		self.changeSettingsScreen("otherSettingsScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
 
 		Clock.schedule_interval(self.updateValues, 1/10)
@@ -122,6 +124,9 @@ class RootWidget(BoxLayout):
 
 		Clock.schedule_interval(self.debug, 5)
 		Clock.schedule_interval(self.debug2, 7)
+
+		self.statusScheduler = None
+		self.showStatus("Oh, hi Mark!", 6)
 
 	def debug(self, *args):
 		if self.playing:
@@ -173,10 +178,11 @@ class RootWidget(BoxLayout):
 		winnerPopup.open()
 
 	def showStatus(self, text, time=1):
-		print(text)
+		if self.statusScheduler is not None:
+			Clock.unschedule(self.statusScheduler)
 		self.showingStatus = True
 		self.currentStatusText = text
-		Clock.schedule_once(self.resetStatus, time)
+		self.statusScheduler = Clock.schedule_once(self.resetStatus, time)
 
 	def setStatus(self, text):
 		self.state = text
@@ -242,11 +248,25 @@ class RootWidget(BoxLayout):
 			self.ids.difficultyDropdown.setIndex(index)
 
 		# if index == 1
+	
+	def changeSpeed(self, index):
+		self.settings.game["robotSpeed"] = index
+		if not index == 0: 
+			self.settings.motors["velocity"] = (16000/3) * index
+			self.settings.motors["acceleration"] = (300/3) * index
+			self.settings.motors["pGain"] = 120
 
+			self.ids.velocitySlider.value = self.settings.motors["velocity"]
+			self.ids.accelerationSlider.value = self.settings.motors["acceleration"]
+			self.ids.pGainSlider.value = self.settings.motors["pGain"]
+
+
+			self.ids.robotSpeedDropdown.setIndex(index)
 
 	def updateStatus(self, *args):
 		# Update everything in status bar		
 		self.setStatus("Idle")
+		if not self.homed: self.setStatus("Homing required!")
 		if not self.game.stopped: self.setStatus("Game running...")
 		if self.game.paused: self.setStatus("Game paused")
 		if self.ids.cameraStream.calibratingField: self.setStatus("Calibrating field...")
@@ -256,27 +276,32 @@ class RootWidget(BoxLayout):
 		self.dateString = datetime.now().strftime('%d.%m.%Y')
 		self.timeString = datetime.now().strftime('%H:%M:%S')
 
-
 	def updateCommunication(self, *args):
 		self.game.setStriker(self.serial.vector)
 		if self.controlMode == 1:
-			self.serial.writeVector(self.game.getDesiredPosition(), "p")
+			if self.playing:
+				self.desiredPos = [*self.game.getDesiredPosition()]
+				self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 2:
-			self.serial.writeVector(self.game.getDesiredVelocity(), "v")
+			if self.playing:
+				self.desiredVel = [*self.game.getDesiredVelocity()]
+				self.serial.writeVector(self.desiredVel, "v")
 		elif self.controlMode == 3:
-			self.serial.writeVector((0,0), "p")
+			self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 4:
-			self.serial.writeVector((0,0), "v")
+			self.serial.writeVector(self.desiredVel, "v")
 		elif self.controlMode == 5:
-			self.serial.writeVector((0,0), "m")
+			self.serial.writeVector(self.desiredMot, "m")
+		# print(self.desiredPos)
 		
-
 	def updateValues(self, *args):
 		# Debug
 		# print(self.desiredPos)
 		# Camera values
 		self.cameraResolution = self.settings.camera["resolution"]
 		self.cameraFps = round(self.camera.counter.movingAverageFps)
+		self.setCameraFps = self.settings.camera["fps"]
+		self.minPuckRad = self.settings.camera["limitPuckRadius"]
 		self.detectionFps = round(self.camera.detectingCounter.movingAverageFps)
 		self.colorToDetect = self.settings.camera["colorToDetect"].tolist()
 		self.normalizedColorToDetect = [self.colorToDetect[0]/180,self.colorToDetect[1]/255,self.colorToDetect[2]/255]
@@ -297,13 +322,19 @@ class RootWidget(BoxLayout):
 		self.frequency = self.settings.game["frequency"]
 		self.strategyDescription = self.game.strategy.description
 
-		# Communication
+		# Motors
+		self.readingLine = self.serial._readingLine
+		self.writingLine = self.serial._writingLine
 		self.strikerPos = self.serial.vector
+		self.motorStatus = self.serial.status if self.serial.status is not None else ""
+		if self.serial.status is not None: self.homed = False
+		self.comFrequency = self.settings.motors["communicationFrequency"]
+		self.setVelocity = self.settings.motors["velocity"]
+		self.setAcceleration = self.settings.motors["acceleration"]
+		self.setPGain = self.settings.motors["pGain"]
 
 		# Strategy stuff
-		self.desiredPos 		= self.game.getDesiredPosition()
-		self.desiredVel 		= self.game.getDesiredVelocity()
-		self.pixelDesiredPos 	= self.camera._toTuple(self.camera._unitsToPixels(self.desiredPos)) 
+		self.pixelDesiredPos = self.camera._toTuple(self.camera._unitsToPixels(self.desiredPos)) 
 
 		# Status
 		self.updateStatus()
@@ -315,32 +346,6 @@ class RootWidget(BoxLayout):
 		self.colorThemeHsv = [self.normalizedColorToDetect[0], 1, 1]
 		self.colorTheme = Color(*self.colorThemeHsv, mode='hsv').rgba
 
-	def getScore(self):
-		score = self.game.score.copy()
-		if not self.score[0] == score[0]: self.addScore(self.ids.human, self.ids.ai, [score[0], score[1]])
-		if not self.score[1] == score[1]: self.addScore(self.ids.ai, self.ids.human, [score[1], score[0]])
-		self.checkGameEnd()
-		return score
-
-	def addScore(self, player, opponent, score):
-		Animation.cancel_all(player, 'portion')
-		if self.settings.game["applyMaxScore"]:
-			anim = Animation(portion=score[0]/self.settings.game["maxScore"], duration=0.5, t="out_back")
-			anim.start(player)
-		else:
-			Animation.cancel_all(opponent, 'portion')
-			anim1 = Animation(portion=min(1,max(0, score[0] - score[1])), duration=0.5, t="out_back")
-			anim2 = Animation(portion=min(1,max(0, score[1] - score[0])), duration=0.5, t="out_back")
-			anim1.start(player)
-			anim2.start(opponent)
-
-	def checkGameEnd(self):
-		if self.game.gameDone:
-			self.game.gameDone = False
-			self.game.stop()
-			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
-			self.openWinnerPopup(winner)
-	
 	def updateDetectedColor(self):
 		if self.settings.camera["lowerLimits"][0] > self.settings.camera["upperLimits"][0]:
 			temp = (int(self.settings.camera["upperLimits"][0]) + 180 + int(self.settings.camera["lowerLimits"][0]))/2
@@ -370,9 +375,9 @@ class RootWidget(BoxLayout):
 			else:
 				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
 			
-			# Update camera screen
-			def cv2kivy(point):
-				return (image.x + point[0]/self.cameraResolution[0] * image.width, image.y + point[1]/self.cameraResolution[1] * image.height)
+		# Update camera screen
+		def cv2kivy(point):
+			return (image.x + point[0]/self.cameraResolution[0] * image.width, image.y + point[1]/self.cameraResolution[1] * image.height)
 			
 		# Update camera frame and everything camera can see in cameraScreen
 		image = self.ids.cameraStream
@@ -391,7 +396,8 @@ class RootWidget(BoxLayout):
 			texture = self.imageToTexture(frame, frameFormat)
 			if texture is not None:
 				image.texture = texture				
-				kivyField = [cv2kivy(point) for point in self.settings.camera["fieldCorners"].tolist()]				
+				kivyField = [cv2kivy((point[0] * self.settings.camera["resolution"][0], point[1] * self.settings.camera["resolution"][1])) for point in self.settings.camera["fieldCorners"].tolist()]	
+				# print(kivyField)			
 				image.fieldCorners = [item for sublist in kivyField for item in sublist]
 				image.puckPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.camera.unitFilteredPuckPosition)))
 				image.desiredPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.game.getDesiredPosition())))
@@ -399,6 +405,64 @@ class RootWidget(BoxLayout):
 			
 			else:
 				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
+	
+	def testMotors(self):
+		targetPositions = [
+			[50, -250],
+			[400, 250],
+			[50, -250],
+			[400, 250],
+			[50,   250],
+			[400, -250],
+			[50,   250],
+			[400, -250]
+		]
+
+		prevMode = self.controlMode
+		self.controlMode = 3
+		for i in range(len(targetPositions)):
+			Clock.schedule_once(partial(self.setDesiredPos, targetPositions[i]), i)
+		
+		Clock.schedule_once(partial(self.setControlMode, prevMode), i+1)
+
+	def setControlMode(self, mode, *args):
+		self.controlMode = mode
+	
+	def setDesiredPos(self, vector, *args):
+		self.desiredPos = vector.copy()
+	def setDesiredVel(self, vector, *args):
+		self.desiredVel = vector.copy()
+	def setDesiredMot(self, vector, *args):
+		self.desiredMot = vector.copy()
+	
+
+	def getScore(self):
+		score = self.game.score.copy()
+		if not self.score[0] == score[0]: self.addScore(self.ids.human, self.ids.ai, [score[0], score[1]])
+		if not self.score[1] == score[1]: self.addScore(self.ids.ai, self.ids.human, [score[1], score[0]])
+		self.checkGameEnd()
+		return score
+
+	def addScore(self, player, opponent, score):
+		Animation.cancel_all(player, 'portion')
+		if self.settings.game["applyMaxScore"]:
+			anim = Animation(portion=score[0]/self.settings.game["maxScore"], duration=0.5, t="out_back")
+			anim.start(player)
+		else:
+			Animation.cancel_all(opponent, 'portion')
+			anim1 = Animation(portion=min(1,max(0, score[0] - score[1])), duration=0.5, t="out_back")
+			anim2 = Animation(portion=min(1,max(0, score[1] - score[0])), duration=0.5, t="out_back")
+			anim1.start(player)
+			anim2.start(opponent)
+
+	def checkGameEnd(self):
+		if self.game.gameDone:
+			self.game.gameDone = False
+			self.game.stop()
+			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
+			self.openWinnerPopup(winner)
+	
+	
 
 	# Helper functions
 	def imageToTexture(self, frame, frameFormat="bgr"):

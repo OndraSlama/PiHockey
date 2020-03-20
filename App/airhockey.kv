@@ -10,10 +10,10 @@
 #:set disabledButtonColor (.85, .85, .85, .3)
 #:set disabledTextColor (0, 0, 0, .4)
 #:set buttonIconsColor (.7, .7, .7, 1)
-#:set disabledIconColor (1, 1, 1, .4)
+#:set iconColor (0, 0, 0, .6)
+#:set disabledIconColor (0, 0, 0, .4)
 #:set infoColor (.85, .85, .85, .3)
 #:set infoTextColor (0, 0, 0, .7)
-#:set iconColor (1, 1, 1, .6)
 #:set sectionBackgroundColor (.8, .8, .8, .2)
 
 # ------------------------------------- Root widget --------------------------------------------
@@ -128,7 +128,8 @@
 							value: root.score[0]
 							id: human
 							colorTheme: root.colorTheme
-							iconSource: "icons/human2.png"
+							iconSource: "icons/human.png"
+							iconSize: .9
 
 						AnchorLayout:
 							anchor_x:"center"
@@ -490,6 +491,7 @@
 											value: root.settings.camera['upperLimits'].tolist()[1]
 											step: 1
 											parameter: 'camera["upperLimits"][1]'
+											on_currentValue: root.updateDetectedColor()
 											onValue: 
 												lambda x: exec('lowerS.value = x if x < lowerS.currentValue else lowerS.currentValue')
 											colorTheme: root.colorTheme
@@ -500,6 +502,7 @@
 											value: root.settings.camera['upperLimits'].tolist()[2]
 											step: 1
 											parameter: 'camera["upperLimits"][2]'
+											on_currentValue: root.updateDetectedColor()
 											onValue: 
 												lambda x: exec('lowerV.value = x if x < lowerV.currentValue else lowerV.currentValue')
 											colorTheme: root.colorTheme
@@ -682,7 +685,7 @@
 													parameter: 'motors["velocity"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.serial.writeLine("setmaxspeed,"+str(self.value))
+														root.serial.writeLine("setmaxspeed,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 
 											BoxLayout:
@@ -701,7 +704,7 @@
 													parameter: 'motors["acceleration"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.serial.writeLine("setaccel,"+str(self.value))
+														root.serial.writeLine("setaccel,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 
 											BoxLayout:
@@ -720,7 +723,7 @@
 													parameter: 'motors["pGain"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.serial.writeLine("kpgain,"+str(self.value))
+														root.serial.writeLine("kpgain,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 									BoxLayout:
 										size_hint_y: .4
@@ -773,6 +776,7 @@
 						SettingScreen:
 							id: otherSettingsScreen
 							name: "otherSettingsScreen"	
+							prevControlMode: 1
 							# BoxLayout:
 							ControlField: 
 								id: controlField
@@ -791,7 +795,7 @@
 									id: controlSlider
 									height: controlField.height * 799/885
 									width: self.height * 232/2222
-									x: controlField.x + (controlField.width * 1165/1296 - self.width*0.42) - (controlField.pusherX/1000) * 1034/1296 * controlField.width
+									x: controlField.x + (controlField.width * 131/1296 - self.width*0.58) + (controlField.pusherX/1000) * 1034/1296 * controlField.width
 									y: controlField.y + (controlField.height - self.height)/2
 									source: "images/slider_landscape.png"	
 						
@@ -800,9 +804,19 @@
 									width: controlSlider.width * 110/83
 									height: self.width
 
-									x: controlSlider.x + (controlSlider.width - self.width)*0.68
-									y: controlSlider.y +  controlField.height/2 - self.height/2 + (controlField.pusherY/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									x: controlSlider.x + (controlSlider.width - self.width)*0.32
+									y: controlField.y +  controlField.height/2 - self.height/2 + (controlField.pusherY/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
 									source: "images/pusher_landscape.png"
+
+								Image:
+									id: controlTarget
+									size: controlStriker.size
+
+									x: controlField.x + (controlField.width * 131/1296 - self.width/2) + (root.desiredPos[0]/1000) * 1034/1296 * controlField.width
+									y: controlField.y +  controlField.height/2 - self.height/2 + (root.desiredPos[1]/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									source: "icons/target.png"
+									color: root.colorTheme
+
 
 
 							
@@ -1227,15 +1241,18 @@
 # Centered icon ---------------------------------------------------------
 <Icon@BoxLayout>:
 	source: ""
+	iconColor: []
+	iconSize: 1
 	AnchorLayout:
 		anchor_x: "center"
 		anchor_y: "center"
 		Image:
 			allow_stretch: True
 			size_hint: None, None
-			width: min(self.parent.width, self.parent.height)
-			height: min(self.parent.width, self.parent.height)
+			width: min(self.parent.width, self.parent.height)*root.iconSize
+			height: min(self.parent.width, self.parent.height)*root.iconSize
 			source: root.source
+			color: iconColor if root.iconColor == [] else root.iconColor
 
 
 	
@@ -1512,10 +1529,12 @@
 	iconSource: ""
 	spacing: 20
 	colorTheme: [1,1,1,1]
+	iconSize: 1
 	Icon:		
 		padding: 0
 		size_hint_y: 0.3
 		source: root.iconSource
+		iconSize: root.iconSize
 	AnchorLayout:
 		anchor_x: "center"
 		anchor_y: "center"

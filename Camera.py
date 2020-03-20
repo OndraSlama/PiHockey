@@ -55,7 +55,7 @@ class Camera():
 		self.cursorPosition = None
 		self.frameCount = 0
 
-		self._determineColorIntervals()
+		# self._determineColorIntervals()
 
 		self.p2uTranformMatrix = None
 		self.u2pTranformMatrix = None

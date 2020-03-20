@@ -37,7 +37,7 @@ EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
 Window.size = (938, 550)
-# Window.fullscreen = True
+#Window.fullscreen = True
 
 class RoundedLook(Widget):
 	pass
@@ -65,7 +65,30 @@ class SliderEditor(BoxLayout,RoundedLook):
 		self.isDown = False
 
 class ControlField(Image):
-	pass
+	def on_touch_down(self, touch):
+		self.mode = 0
+		fieldPos = self.getFieldPos([touch.x, touch.y])
+		app = App.get_running_app()
+
+		if 0 < fieldPos[0] < 500 and abs(fieldPos[1]) < 300:
+			self.mode = 3
+			app.root.controlMode = 3
+			app.root.desiredPos = fieldPos.copy()
+		# print(app.root.controlMode)
+	def on_touch_move(self, touch):
+		if self.mode == 3:
+			fieldPos = self.getFieldPos([touch.x,  touch.y])
+
+			app = App.get_running_app()
+			app.root.desiredPos = [max(0, min(500, fieldPos[0])), max(-300, min(300,fieldPos[1])) ]
+
+	def on_touch_up(self, touch):
+		self.mode = 0
+		app = App.get_running_app()
+
+	def getFieldPos(self, pos):
+		return[int((pos[0] - (self.x + self.width * 131/1296))*1000/(self.width*(1034/1296))), 
+				int((pos[1] - (self.y + self.height/2))*300/(self.height/2*(621/800)))]
 
 class ImageViewer(Image):
 	def on_touch_down(self, touch):
@@ -193,23 +216,33 @@ class RootWidget(BoxLayout):
 		self.showingStatus = False
 		self.currentStatusText = self.state
 	
-	def changeSettingsScreen(self, screenName):
+	def changeSettingsScreen(self, nextScreen):
 		self.settings.saveSettings()
+		current = self.ids.settingsScreenManager.current
 		screens = ["gameSettingsScreen", "cameraSettingsScreen", "motorsSettingsScreen", "otherSettingsScreen"]
-		if screens.index(self.ids.settingsScreenManager.current) < screens.index(screenName):
+		if screens.index(current) < screens.index(nextScreen):
 			direction = "left"
 		else:
 			direction = "right"
 
+		if nextScreen == "otherSettingsScreen":
+			self.ids.otherSettingsScreen.prevMode = self.controlMode
+
+		if current == "otherSettingsScreen":
+			self.controlMode = self.ids.otherSettingsScreen.prevMode
+
+		# print(self.controlMode)
+
+
 		self.ids.settingsScreenManager.transition.direction = direction
-		self.ids.settingsScreenManager.current = screenName
+		self.ids.settingsScreenManager.current = nextScreen
 		for button in self.ids.settingsNavigationPanel.children:
 			Animation.cancel_all(button, 'roundedCorners', "posHint", "alpha")
 			anim = Animation(roundedCorners=[1,1,1,1], posHint=0, alpha=1, duration=0.5, t="out_back")
 			anim.start(button)
 
 		anim = Animation(roundedCorners=[1,1,0,0], posHint=-.2, alpha=0, duration=0.5, t="out_back")
-		anim.start(self.ids[screenName + "Button"])
+		anim.start(self.ids[nextScreen + "Button"])
 
 	def changeScreen(self, screenName):
 		# Changing screen logic (animation, direction of the slide animation etc.)
@@ -296,7 +329,7 @@ class RootWidget(BoxLayout):
 		
 	def updateValues(self, *args):
 		# Debug
-		# print(self.desiredPos)
+		# print(self.serial._readingCounter.print())
 		# Camera values
 		self.cameraResolution = self.settings.camera["resolution"]
 		self.cameraFps = round(self.camera.counter.movingAverageFps)
@@ -309,7 +342,7 @@ class RootWidget(BoxLayout):
 		self.whiteBalance = self.settings.camera["whiteBalance"]
 		self.puckPos = [round(self.camera.unitFilteredPuckPosition.x), round(self.camera.unitFilteredPuckPosition.y)]
 		self.puckPixelPos = [*self.camera._toTuple(self.camera._unitsToPixels(self.puckPos))]
-		
+
 		# Game stuff
 		self.playing = not self.game.stopped
 		self.paused = self.game.paused
@@ -409,13 +442,13 @@ class RootWidget(BoxLayout):
 	def testMotors(self):
 		targetPositions = [
 			[50, -250],
-			[400, 250],
+			[450, 250],
 			[50, -250],
-			[400, 250],
+			[450, 250],
 			[50,   250],
-			[400, -250],
+			[450, -250],
 			[50,   250],
-			[400, -250]
+			[450, -250]
 		]
 
 		prevMode = self.controlMode

@@ -60,6 +60,7 @@ class FPSCounter():
 		self.averageFps = 0
 		self.counter = Repeater(self.update, updateEvery)
 		self.printRepeater = None
+		self.printTitle = None
 
 		self.fpsHistory = []
 		self.movingAverage = movingAverage

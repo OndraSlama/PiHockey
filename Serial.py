@@ -33,16 +33,24 @@ class Serial():
 		self._writingLine = txt
 	
 	def writeVector(self, vector, mode):
-		self.writeLine("{},{}".format(*[*vector].copy()))
+		self.writeLine("{},{},{}".format(mode,*[*vector].copy()))
 
 	def _reading(self):
+		_prevTime = time.time()
+		_num = 0
 		while True:
-			self._lastRead = time.time()
+			self._lastRead = time.time() 	
 			self._readingCounter.tick()
 			try:
 				self._readingLine = self._ser.readline().decode('utf-8').rstrip()
-				# print(self._readingLine)
+				#print(self._readingLine)
 				self._parseReading(self._readingLine)
+				_num += 1
+				if time.time() - _prevTime > 1:
+					_prevTime = time.time()
+					print(_num)
+					_num = 0
+
 			except:
 				print("Error while decoding")
 				
@@ -56,12 +64,12 @@ class Serial():
 	def _writing(self):
 		while True:
 			self._lastWrite = time.time()
-
+			#print(time.time())
 			if not self._writingLine == self._prevWrite and not self._writingLine == "":
 				self._writingCounter.tick()
 				self._prevWrite = self._writingLine			
 				self._ser.write((str(self._writingLine) + '\n').encode('ascii'))
-
+				#print((str(self._writingLine) + '\n'))
 			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWrite)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
@@ -74,16 +82,26 @@ class Serial():
 			self.status = txt
 		else:
 			try:
-				parse = [round(float(x)) for x in txt.split(",")][:2]
+				# print(txt.split(",")[1:3])
+				# [print(x) for x in txt.split(",")[1:3]]
+				parse = []
+				for x in txt.split(","):
+					try:
+						parse.append(round(float(x)))
+					except: pass
+					# parse = [round(float(x)) for x in txt.split(",")[1:3]]
+					
 				self.vector = parse[0], parse[1]
-			except:
+
+			except Exception as e: 
+				# print(e)
 				pass
 				# print("Could not parse reading.")
 							     
 
 	def start(self):
 		if self._stopped:
-			self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate, )	
+			self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
 			self._ser.flush()
 			self._readingCounter.start()
 			self._writingCounter.start()

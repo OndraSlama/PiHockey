@@ -21,8 +21,7 @@ class StrategyC(BaseStrategy):
 		self.state = DEFEND
 		self.subState = DEFEND
 
-	def process(self, stepTime):
-		self.stepTick(stepTime)	 
+	def _process(self): 
 
 		def case(state):
 			return state == self.state
@@ -101,24 +100,6 @@ class StrategyC(BaseStrategy):
 
 	# Other functions
 
-	def defendGoalDefault(self):
-		if self.bounces and self.puck.state == ACURATE:
-			fromPoint = self.puck.trajectory[-1].start
-		else:
-			fromPoint = self.puck.position
-
-		a = Line(fromPoint, Vector2(0,0))
-		b = Line(Vector2(DEFENSE_LINE, 0), Vector2(DEFENSE_LINE, FIELD_HEIGHT))
-		desiredPosition = self.getIntersectPoint(a, b)
-		if desiredPosition is not None:
-			self.setDesiredPosition(Vector2(desiredPosition))
-
-	def defendGoalLastLine(self):
-		if not self.goalLineIntersection == -10000 and self.puck.state == ACURATE:
-			self.setDesiredPosition(Vector2(STRIKER_RADIUS, self.goalLineIntersection))
-		else:
-			self.setDesiredPosition(Vector2(STRIKER_RADIUS, sign(self.puck.position.y) * min(GOAL_SPAN/2, abs(self.puck.position.y))))
-
 	def defendTrajectory(self):		
 
 		if len(self.puck.trajectory) > 0:
@@ -136,19 +117,16 @@ class StrategyC(BaseStrategy):
 			else:
 				self.setDesiredPosition(desiredPos)
 
-	def isPuckBehingStriker(self):
-		return self.striker.position.x > self.puck.position.x - PUCK_RADIUS
-
 	def shouldIntercept(self):
 		if len(self.puck.trajectory) == 0:
 			return 0
-		return self.puck.state == ACURATE and (not self.bounces or self.puck.trajectory[-1].start.x < STRIKER_AREA_WIDTH - STRIKER_RADIUS*3 ) and self.puck.vector.x < 0
+		return self.puck.state == ACURATE and (not self.willBounce or self.puck.trajectory[-1].start.x < STRIKER_AREA_WIDTH - STRIKER_RADIUS*3 ) and self.puck.vector.x < 0
 
 	def isPuckDangerous(self):
 		if self.puck.position.x > FIELD_WIDTH/2:
 			return True
 
-		if self.bounces and self.puck.state == ACURATE and self.puck.vector.x < 0:
+		if self.willBounce and self.puck.state == ACURATE and self.puck.vector.x < 0:
 			if len(self.puck.trajectory) > 0:
 				if self.getPointLineDist(self.striker.position, self.puck.trajectory[0]) > PUCK_RADIUS:
 					perpendicularPoint = self.getPerpendicularPoint(self.striker.position, self.puck.trajectory[0])				

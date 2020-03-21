@@ -233,7 +233,6 @@ class RootWidget(BoxLayout):
 
 		# print(self.controlMode)
 
-
 		self.ids.settingsScreenManager.transition.direction = direction
 		self.ids.settingsScreenManager.current = nextScreen
 		for button in self.ids.settingsNavigationPanel.children:
@@ -252,7 +251,8 @@ class RootWidget(BoxLayout):
 			direction = "up"
 		else:
 			direction = "down"
-			
+		
+		self.controlMode = self.ids.otherSettingsScreen.prevMode
 		
 		self.ids.screenManager.transition.direction = direction
 		self.ids.screenManager.current = screenName

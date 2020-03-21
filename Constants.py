@@ -9,15 +9,19 @@ HUMAN = 1
 FIELD_WIDTH = 1000
 FIELD_HEIGHT = 600
 GOAL_SPAN = 240
-STRIKER_AREA_WIDTH = 445
+
+# Limits
+YLIMIT = 230
+XLIMIT = 70
+STRIKER_AREA_WIDTH = 450
 
 # Objects sizes in game units
 PUCK_RADIUS = 32
-STRIKER_RADIUS = 120
+STRIKER_RADIUS = 50
 
 # -------------- STRATEGY --------------
 DEFENSE_LINE = STRIKER_RADIUS + PUCK_RADIUS
-STOPPING_LINE = FIELD_WIDTH/6
+STOPPING_LINE = 350
 CLOSE_DISTANCE = PUCK_RADIUS # what is considered to be "close enough"
 
 # -------------- LIMITS --------------
@@ -25,6 +29,3 @@ CLOSE_DISTANCE = PUCK_RADIUS # what is considered to be "close enough"
 MAX_ACCELERATION = 10000
 MAX_SPEED = 1000
 
-# -------------- RULES --------------
-GOAL_LIMIT = 3
-TIME_LIMIT = 120 #seconds

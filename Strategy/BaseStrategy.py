@@ -6,8 +6,10 @@ from pygame.math import Vector2
 
 class BaseStrategy():
 	def __init__(self):
+		# DEBUG
+		self.debugLines = []
+		self.debugString = ""
 		self.description = "Strategy with no gameplay mechanics."
-		
 		# Striker
 		self.striker = StrategyStriker()
 		self.opponentStriker = StrategyStriker()
@@ -19,7 +21,7 @@ class BaseStrategy():
 
 		# Trajectory info
 		self.goalLineIntersection = 0
-		self.bounces = False
+		self.willBounce = False
 
 		# Parameters
 		self.historySize = 50
@@ -47,7 +49,33 @@ class BaseStrategy():
 		# Init
 		for i in range(self.historySize - 1):
 			self.puckHistory.append(StrategyPuck())
+
+	#  Main process function -----------------------------------------------------------------------------------
+	def process(self, stepTime):
+		# DEBUG
+		self.debugLines = []
+		# self.debugString = ""
+
+		self.stepTick(stepTime)
+		self._process()
+		self.limitMovement()
+		self.calculateDesiredVelocity()
 		
+
+	# Only this should be overwriten in inherited strategies 
+	def _process(self):
+		self.setDesiredPosition(self.striker.position) # Placeholder
+
+		# Your strategy code
+	
+	# Puck position handlers ------------------------------------------------------------------
+
+	def stepTick(self, stepTime):
+		self.stepTime = stepTime
+		self.gameTime += stepTime
+		for puck in self.puckHistory:
+			puck.timeSinceCaptured += stepTime
+
 	def cameraInput(self, pos):
 		if pos == self.puck.position: return
 		self.initialCheck(pos)
@@ -55,11 +83,6 @@ class BaseStrategy():
 		self.checkState()
 		self.calculateTrajectory()	
 
-	def stepTick(self, stepTime):
-		self.stepTime = stepTime
-		self.gameTime += stepTime
-		for puck in self.puckHistory:
-			puck.timeSinceCaptured += stepTime
 
 	def initialCheck(self, pos):
 		self.puck.state = ACURATE
@@ -107,7 +130,12 @@ class BaseStrategy():
 		# 	if i <= 1: break
 		# 	i -= 1
 		
-		
+	def setStriker(self, pos):
+		self.striker.position = Vector2(pos)
+
+	def setOpponentStriker(self, pos):
+		self.opponentStriker.position = Vector2(pos)
+
 	def setPuck(self, pos):
 		self.puck = StrategyPuck(self.puck.state, pos)
 		self.puckHistory.pop(-1)
@@ -119,6 +147,7 @@ class BaseStrategy():
 			if self.firstUsefull == 1: break
 		
 		if not self.puckHistory[self.firstUsefull].timeSinceCaptured == 0:
+			# if self.firstUsefull > 3:
 			stepVector = pos - self.puckHistory[self.firstUsefull].position
 			self.puck.velocity = stepVector / self.puckHistory[self.firstUsefull].timeSinceCaptured
 
@@ -126,14 +155,11 @@ class BaseStrategy():
 			self.puck.velocity = self.velocityFilter.filterData(self.puck.velocity)
 
 			self.puck.vector = self.puck.velocity.normalize()
-			self.puck.speedMagnitude = self.puck.velocity.magnitude()		
+			self.puck.speedMagnitude = self.puck.velocity.magnitude()
+		# else:
+			# 	self.puck.state = INACURATE
+
 			self.puck.timeSinceCaptured = 0
-
-	def setStriker(self, pos):
-		self.striker.position = Vector2(pos)
-
-	def setOpponentStriker(self, pos):
-		self.opponentStriker.position = Vector2(pos)
 	
 	def checkState(self):
 		# Check for inacurate
@@ -146,11 +172,8 @@ class BaseStrategy():
 		if self.firstUsefull < round(self.historySize/20):
 			self.puck.state = INACURATE
 
-	def process(self, stepTime):
-		self.stepTick(stepTime)
-		self.setDesiredPosition(self.striker.position)
-		
-		# Your strategy code here	
+
+	# Desired position / velocity modification -------------------------------------------------------------------
 
 	def setDesiredPosition(self, pos):
 		self.striker.desiredPosition = Vector2(pos)
@@ -164,13 +187,10 @@ class BaseStrategy():
 		if posNextStep.x > STRIKER_AREA_WIDTH:
 			vel.x = 0
 
-		if abs(posNextStep.y) > FIELD_HEIGHT/2 - STRIKER_RADIUS:
+		if abs(posNextStep.y) > YLIMIT:
 			vel.y = 0
 
-		if posNextStep.x < STRIKER_RADIUS: 
-			vel.x = 0
-
-		if posNextStep.x > FIELD_WIDTH - STRIKER_RADIUS: 
+		if posNextStep.x < XLIMIT: 
 			vel.x = 0
 
 		self.striker.desiredVelocity = vel
@@ -178,18 +198,15 @@ class BaseStrategy():
 	def clampDesired(self, fromPos, step):
 		desiredPos = fromPos + step
 		line = Line(fromPos, desiredPos)
-
+		self.debugLines.append(line)
 		if desiredPos.x > STRIKER_AREA_WIDTH:
 			desiredPos = self.getBothCoordinates(line, x = STRIKER_AREA_WIDTH)
 
-		if abs(desiredPos.y) > FIELD_HEIGHT/2 - STRIKER_RADIUS:
-			desiredPos = self.getBothCoordinates(line, y = sign(desiredPos.y) * FIELD_HEIGHT/2 - STRIKER_RADIUS)
+		if abs(desiredPos.y) > YLIMIT:
+			desiredPos = self.getBothCoordinates(line, y = sign(desiredPos.y) * YLIMIT)
 
-		if desiredPos.x < STRIKER_RADIUS: 
-			desiredPos = self.getBothCoordinates(line, x = STRIKER_RADIUS)
-
-		if desiredPos.x > FIELD_WIDTH - STRIKER_RADIUS: 
-			desiredPos = self.getBothCoordinates(line, x = STRIKER_RADIUS)
+		if desiredPos.x < XLIMIT: 
+			desiredPos = self.getBothCoordinates(line, x = XLIMIT)
 
 		self.setDesiredPosition(desiredPos)
 
@@ -198,24 +215,23 @@ class BaseStrategy():
 		if self.striker.desiredPosition.x > STRIKER_AREA_WIDTH:
 			self.striker.desiredPosition.x = STRIKER_AREA_WIDTH
 
-		if abs(self.striker.desiredPosition.y) > FIELD_HEIGHT/2 - STRIKER_RADIUS:
-			self.striker.desiredPosition.y = sign(self.striker.desiredPosition.y) * (FIELD_HEIGHT/2 - STRIKER_RADIUS)
+		if abs(self.striker.desiredPosition.y) > YLIMIT:
+			self.striker.desiredPosition.y = sign(self.striker.desiredPosition.y) * YLIMIT
 
-		if self.striker.desiredPosition.x < STRIKER_RADIUS: 
-			self.striker.desiredPosition.x = STRIKER_RADIUS
-
-		if self.striker.desiredPosition.x > FIELD_WIDTH - STRIKER_RADIUS: 
-			self.striker.desiredPosition.x = FIELD_WIDTH - STRIKER_RADIUS
+		if self.striker.desiredPosition.x < XLIMIT: 
+			self.striker.desiredPosition.x = XLIMIT
 
 	def calculateDesiredVelocity(self):
 		gain = (MAX_ACCELERATION/700)
 		self.striker.desiredVelocity = gain*(self.striker.desiredPosition - self.striker.position)
 
+	# Checkers ------------------------------------------------------------------------------
+
 	def isOutsideLimits(self, pos):
 		if pos.x > STRIKER_AREA_WIDTH: return True
-		if abs(pos.y) > FIELD_HEIGHT/2 - STRIKER_RADIUS: return True
-		if pos.x < STRIKER_RADIUS: return True
-		if pos.x > FIELD_WIDTH - STRIKER_RADIUS: return True
+		if abs(pos.y) > YLIMIT: return True
+		if pos.x < XLIMIT: return True
+		if pos.x > FIELD_WIDTH - XLIMIT: return True
 
 		return False
 
@@ -228,59 +244,17 @@ class BaseStrategy():
 
 		return False
 
-	def calculateTrajectory(self):
-		self.puck.trajectory = []		
-		yBound = (FIELD_HEIGHT / 2 - PUCK_RADIUS)
-		myLine = Line(self.puck.position, self.puck.position)
-		tempVector = Vector2(self.puck.vector)
-		
-		self.goalLineIntersection = -10000
-
-		for i in range(self.noOfBounces + 1):
-			if not tempVector.x == 0:
-				a = tempVector.y / tempVector.x
-				b = myLine.start.y - a * myLine.start.x
-			else:
-				a = 0
-				b = 0				
-
-			if tempVector.x == 0:
-				myLine.end.y = sign(tempVector.y) * yBound				
-				tempVector.y *= -1   
-			else:
-				myLine.end.x = (sign(tempVector.y) * yBound - b) / a
-				myLine.end.y = sign(tempVector.y) * yBound
-				tempVector.y *= -1	
-
-			if myLine.end.x < PUCK_RADIUS:
-				myLine.end.x = PUCK_RADIUS
-				myLine.end.y = a*myLine.end.x + b
-				tempVector.x *= -1
-				tempVector.y *= -1
-
-				# Set goal interection
-				self.goalLineIntersection = myLine.end.y
-
-			elif myLine.end.x > FIELD_WIDTH - PUCK_RADIUS:
-				myLine.end.x = FIELD_WIDTH - PUCK_RADIUS
-				myLine.end.y = a*myLine.end.x + b
-				tempVector.x *= -1
-				tempVector.y *= -1
-				
-
-			self.puck.trajectory.append(myLine.copy())
-			# If puck aims at goal, break
-			if abs(myLine.end.y) < FIELD_HEIGHT/2 - PUCK_RADIUS: break
-			myLine.start.x = myLine.end.x
-			myLine.start.y = myLine.end.y
-
-		if len(self.puck.trajectory) > 1:
-			self.bounces = True
-		else:
-			self.bounces = False
+	def isPuckBehingStriker(self, pos = None):
+		if pos is None: pos = self.puck.position
+		return self.striker.position.x > pos.x - PUCK_RADIUS*2
+	
 			
+	# Get functions --------------------------------------------------------------
 
 	def getIntersectPoint(self, line1, line2):
+		self.debugLines.append(line1)
+		self.debugLines.append(line2)
+
 		p1 = (line1.start.x, line1.start.y)
 		p2 = (line1.end.x, line1.end.y)
 		p3 = (line2.start.x, line2.start.y)
@@ -353,7 +327,7 @@ class BaseStrategy():
 		if a is not None:
 			if y is not None:
 				if not a==0:
-					x = (b - y)/a				
+					x = (y - b)/a				
 			elif x is not None:
 				y = a*x + b
 		elif y is not None:
@@ -363,10 +337,12 @@ class BaseStrategy():
 	def getPerpendicularPoint(self, pos, line):
 		vector = line.end - line.start
 		perpendiculatVector = Vector2(-vector.y, vector.x)
-		secondPoint = pos + perpendiculatVector
-		return self.getIntersectPoint(line, Line(pos, secondPoint))
+		# secondPoint = pos + perpendiculatVector
 
-	def getPredictedPuckPosition(self, strikerPos, reserve=1.3):
+		return self.getIntersectPoint(line, Line(pos - perpendiculatVector, pos + perpendiculatVector))
+
+	def getPredictedPuckPosition(self, strikerPos = None, reserve=1.3):
+		if strikerPos is None: strikerPos = self.striker.desiredPosition
 		if self.puck.state == INACURATE:
 			return Vector2(self.puck.position)
 		if len(self.puck.trajectory) > 0:
@@ -374,12 +350,70 @@ class BaseStrategy():
 			time = dist/MAX_SPEED
 			vector = Vector2(self.puck.vector) * (self.puck.speedMagnitude * time)
 			position =  self.puck.position + vector * reserve
-			if position.x < STRIKER_RADIUS and abs(position.y) < FIELD_HEIGHT - PUCK_RADIUS:
-				position.x = STRIKER_RADIUS
+			if position.x < PUCK_RADIUS and abs(position.y) < FIELD_HEIGHT - PUCK_RADIUS:
+				position.x = PUCK_RADIUS
 				position.y = self.goalLineIntersection		
 			self.predictedPosition = position
 			return position
 		return Vector2(0,0)
+
+	# Line math ---------------
+	def calculateTrajectory(self):
+		self.puck.trajectory = []		
+		yBound = (FIELD_HEIGHT / 2 - PUCK_RADIUS)
+		myLine = Line(self.puck.position, self.puck.position)
+		tempVector = Vector2(self.puck.vector)
+		
+		self.goalLineIntersection = -10000
+
+		for i in range(self.noOfBounces + 1):
+			if not tempVector.x == 0:
+				a = tempVector.y / tempVector.x
+				b = myLine.start.y - a * myLine.start.x
+			else:
+				a = 0
+				b = 0				
+
+			if tempVector.x == 0: # not a function - vertical line
+				myLine.end.x =	myLine.start.x	
+				myLine.end.y = sign(tempVector.y) * yBound
+
+			elif a == 0:  # no slope - horizontal line
+				myLine.end.x =	sign(tempVector.x) * FIELD_WIDTH
+				myLine.end.y = myLine.start.y
+
+			else: # normal linear line
+				myLine.end.x = (sign(tempVector.y) * yBound - b) / a
+				myLine.end.y = sign(tempVector.y) * yBound
+
+			tempVector.y *= -1	
+
+			if myLine.end.x < PUCK_RADIUS:
+				myLine.end.x = PUCK_RADIUS
+				myLine.end.y = a*myLine.end.x + b
+				tempVector.x *= -1
+				tempVector.y *= -1
+
+				# Set goal interection
+				self.goalLineIntersection = myLine.end.y
+
+			elif myLine.end.x > FIELD_WIDTH - PUCK_RADIUS:
+				myLine.end.x = FIELD_WIDTH - PUCK_RADIUS
+				myLine.end.y = a*myLine.end.x + b
+				tempVector.x *= -1
+				tempVector.y *= -1
+				
+
+			self.puck.trajectory.append(myLine.copy())
+			# If puck aims at goal, break
+			if abs(myLine.end.y) < FIELD_HEIGHT/2 - PUCK_RADIUS: break
+			myLine.start.x = myLine.end.x
+			myLine.start.y = myLine.end.y
+
+		if len(self.puck.trajectory) > 1:
+			self.willBounce = True
+		else:
+			self.willBounce = False
 
 	def calculateGradient(self, p1, p2):  
 		# Ensure that the line is not vertical
@@ -395,60 +429,76 @@ class BaseStrategy():
 		else:
 			return None
 
-	# draw():
-	# 	if(self.player.color == "red"):
-	# 		# Speed vector
-	# 		pos = b2.u2p(self.ball.position)
-	# 		# stroke(0, 255, 0, 100)
-	# 		# strokeWeight(4)
-	# 		# line(pos.x, pos.y, pos.x + self.ball.velocity.x, pos.y)
-	# 		# line(pos.x, pos.y, pos.x, pos.y - self.ball.velocity.y)
-
-	# 		# Trajectory
-	# 		strokeWeight(1)
-	# 		for (myLine of self.ball.trajectory):
-	# 			pos = b2.u2p(myLine.start.x, myLine.start.y)
-	# 			pos2 = b2.u2p(myLine.end.x, myLine.end.y)
-	# 			stroke(255, 0, 0, 100)
-	# 			line(pos.x, pos.y, pos2.x, pos2.y)
 
 
-	# 		# Ball history   
-	# 		noFill()		
-	# 		for(i = 0 i < self.balls.length i += 1):	 
-	# 			pos = b2.u2p(self.balls[i].position)
-	# 			nextPos = b2.u2p(self.balls[min(i + 1, self.balls.length - 1)].position)
-	# 			if (self.balls[i].state == UNKNOWN):
-	# 				stroke(255, 0, 0, 150)
-	# 			else:
-	# 				stroke(0, 255, 0, 150)
-				
-	# 			ellipse(pos.x, pos.y, 4)
-	# 			line(pos.x, pos.y, nextPos.x, nextPos.y)						
-			
-		
+	# Basic strategy functions used in Process method ---------------------------------------------
 
-	# 	# Desired pos
-	# 	desired = createVector()
-	# 	for (axis of self.playerAxes):				
-			
-	# 		if (self.player.color == "blue"):
-	# 			desired = b2.u2p(FIELD_WIDTH - axis.x, -axis.desiredIntercept)
-	# 		else:
-	# 			desired = b2.u2p(axis.x, axis.desiredIntercept)
+	def defendGoalDefault(self):
+		if self.willBounce and self.puck.state == ACURATE and self.puck.vector.x < -0.15:
+			if self.puck.trajectory[-1].end.x > XLIMIT + STRIKER_RADIUS:
+				fromPoint = self.puck.trajectory[-1].end
+			else:
+				fromPoint = self.puck.trajectory[-1].start
+		else:
+			fromPoint = self.puck.position
 
-	# 		stroke("black")
-	# 		fill("black")
-	# 		ellipse(desired.x, desired.y, 4)
+		a = Line(fromPoint, Vector2(0,0))
+		b = Line(Vector2(DEFENSE_LINE, -FIELD_HEIGHT/2), Vector2(DEFENSE_LINE, FIELD_HEIGHT/2))
+
+		desiredPosition = self.getIntersectPoint(a, b)
+
+		self.debugLines.append(a)
+		self.debugLines.append(b)
+		self.debugString = "basic.defendGoalDefault"
+
+		if desiredPosition is not None:
+			self.setDesiredPosition(Vector2(desiredPosition))
+	
+	def defendGoalLastLine(self):
+		if not self.goalLineIntersection == -10000 and self.puck.state == ACURATE and self.puck.vector.x < 0:
+			blockY = self.goalLineIntersection
+		elif self.puck.state == ACURATE and self.puck.vector.x < 0:
+			blockY = self.puck.trajectory[0].end.y
+		else: 
+			blockY = self.puck.position.y
+
+		# self.debugLines.append(a)
+		self.debugString = "basic.defendGoalLastLine"
+
+		self.setDesiredPosition(Vector2(XLIMIT,  sign(blockY) * min(GOAL_SPAN/2 + STRIKER_RADIUS, abs(blockY))))
+			# self.setDesiredPosition(Vector2(XLIMIT, sign(self.puck.position.y) * min(GOAL_SPAN/2, abs(self.puck.position.y))))
+
+	def defendTrajectory(self):
+		if len(self.puck.trajectory) > 0:
+			vector = Vector2(-self.puck.vector.y, self.puck.vector.x)
+			secondPoint = self.striker.position + vector
+
+			self.debugString = "basic.defendTrajectory"
+			self.debugLines.append(self.puck.trajectory[0])
+			self.debugLines.append(Line(self.striker.position, secondPoint))
+			self.setDesiredPosition(self.getIntersectPoint(self.puck.trajectory[0], Line(self.striker.position, secondPoint)))
+	
+	def shouldIntercept(self):
+		if len(self.puck.trajectory) == 0:
+			return 0
+		return self.puck.state == ACURATE and (not self.willBounce or (sign(self.puck.vector.y) * self.puck.trajectory[-1].end.y > GOAL_SPAN )) and self.puck.vector.x < 0
 
 
+	def isPuckDangerous(self):
+		if self.puck.position.x > STRIKER_AREA_WIDTH:
+			return True
 
+		if abs(self.puck.velocity.y) > MAX_SPEED:
+			return True
 
+		if self.willBounce:
+			return True
 
-# class strategyAxis:
-#	 constructor():
-#		 self.position
-#		 self.velocity
-#		 self.trajectory
-#
-# 
+		if self.striker.position.x > self.puck.position.x - PUCK_RADIUS:
+			return True
+
+		if abs(self.goalLineIntersection) < (GOAL_SPAN/2) * 1.2 and self.puck.state == ACURATE:
+			if len(self.puck.trajectory) > 0:
+				if self.getPointLineDist(self.striker.position, self.puck.trajectory[-1]) > PUCK_RADIUS:
+					return True
+		return False

@@ -629,41 +629,41 @@
 											BoxLayout:
 												spacing: 10
 												InfoTuple:
-													size_hint_x: 1.35
-													title: "Last Read"
-													value: root.readingLine
+													title: "Control mode"
+													value: str(root.controlMode)
 												InfoTuple:
 													title: "Vector"
 													value: "{:3d},{:3d}".format(*root.strikerPos)
 												InfoTuple:
 													title: "Status"
 													value: root.motorStatus
-											BoxLayout:
-												spacing: 10
-												InfoTuple:
-													# size_hint_x: 1.35
-													title: "Last Write"
-													value: root.writingLine
+											InfoTuple:
+												# size_hint_x: 1.35
+												title: "Last Write"
+												value: root.writingLine
 												# InfoTuple:
 												# 	title: "Cmd"
 												# 	value: "Home"
-												InfoTuple:
-													title: "Control mode"
-													value: str(root.controlMode)
-											BoxLayout:
-												# size_hint_y: 1.1
-												spacing: 10
-												SettingsLabel:
-													size_hint_x: .65
-													text: "Serial Frequency"
-													textMagnitude: .4
-												SliderEditor:
-													text: "{:3d} Hz".format(root.comFrequency)
-													limits: [100, 600]
-													value: root.settings.motors['communicationFrequency']
-													step: 50
-													parameter: 'motors["communicationFrequency"]'
-													colorTheme: root.colorTheme
+											InfoTuple:
+												# size_hint_x: 1.35
+												title: "Last Read"
+												value: root.readingLine
+												
+											# BoxLayout:
+											# 	# size_hint_y: 1.1
+											# 	spacing: 10
+											# 	SettingsLabel:
+											# 		size_hint_x: .4
+											# 		text: "Serial Frequency"
+											# 		textMagnitude: .4
+											# 	SliderEditor:
+											# 		disabled: True
+											# 		text: "{:3d} Hz".format(root.comFrequency)
+											# 		limits: [200, 600]
+											# 		value: root.settings.motors['communicationFrequency']
+											# 		step: 50
+											# 		parameter: 'motors["communicationFrequency"]'
+											# 		colorTheme: root.colorTheme
 
 									BoxLayout: # Motors
 										BoxLayout:
@@ -672,14 +672,16 @@
 											BoxLayout:
 												spacing: 10
 												SettingsLabel:
-													size_hint_x: .65
+													size_hint_x: .4
 													text: "Max velocity"
 													textMagnitude: .4
 												SliderEditor:
 													id: velocitySlider
 													# textMagnitude: .37
-													text: "{:1.2f}m/s".format(root.setVelocity * 0.075 / 1000)
-													limits: [1000, 16000]
+													# text: "{:1.2f}m/s".format(root.setVelocity * 0.075 / 1000)
+													# text: "{:2.0f}K{:1.0f}".format(root.setVelocity//1000,  round(root.setVelocity/1000 - root.setVelocity//1000, 1) * 10)
+													text: "{:2.1f}k".format(root.setVelocity/1000)
+													limits: [1000, 14000]
 													value: root.settings.motors['velocity']
 													step: 200
 													parameter: 'motors["velocity"]'
@@ -691,16 +693,16 @@
 											BoxLayout:
 												spacing: 10
 												SettingsLabel:
-													size_hint_x: .65
+													size_hint_x: .4
 													text: "Acceleration"
 													textMagnitude: .4
 												SliderEditor:
 													id: accelerationSlider
 													# textMagnitude: .37
-													text: "{:3.0f}".format(root.setAcceleration)
-													limits: [20, 300]
+													text: "{:2.1f}k".format(root.setAcceleration/1000)
+													limits: [5000, 20000]
 													value: root.settings.motors['acceleration']
-													step: 20
+													step: 200
 													parameter: 'motors["acceleration"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
@@ -710,14 +712,14 @@
 											BoxLayout:
 												spacing: 10
 												SettingsLabel:
-													size_hint_x: .65
+													size_hint_x: .4
 													text: "P Gain"
 													textMagnitude: .4
 												SliderEditor:
 													id: pGainSlider
 													# textMagnitude: .37
 													text: "{:3.0f}".format(root.setPGain)
-													limits: [80, 160]
+													limits: [80, 250]
 													value: root.settings.motors['pGain']
 													step: 5
 													parameter: 'motors["pGain"]'
@@ -768,20 +770,17 @@
 										y: slider.y + (slider.height - self.height)*0.7
 										source: "images/pusher.png"
 								
-										
-
-
-							
 			# ------------------------------------- Control screen --------------------------------------------
 						SettingScreen:
 							id: otherSettingsScreen
 							name: "otherSettingsScreen"	
-							prevControlMode: 1
+							prevMode: 1
 							# BoxLayout:
 							ControlField: 
 								id: controlField
 								size_hint_x: None
 								width: self.height * (1296/800)
+								mode: 3
 								# center: self.parent.center
 								pos_hint: {"center_x": .5, "center_y": .5}
 

@@ -36,8 +36,8 @@ from kivy.base import EventLoop
 EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
-Window.size = (938, 550)
-#Window.fullscreen = True
+# Window.size = (938, 550)
+Window.fullscreen = True
 
 class RoundedLook(Widget):
 	pass
@@ -278,23 +278,25 @@ class RootWidget(BoxLayout):
 			self.ids.robotSpeedDropdown.setIndex(self.settings.game["robotSpeed"]) 
 			self.ids.strategyDropdown.setIndex(self.settings.game["strategy"])
 
-			self.ids.difficultyDropdown.setIndex(index)
+			Clock.schedule_once(partial(self.executeString, 'self.ids.difficultyDropdown.setIndex(' + str(index) + ')'), .25)
 
 		# if index == 1
 	
 	def changeSpeed(self, index):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
-			self.settings.motors["velocity"] = (16000/3) * index
-			self.settings.motors["acceleration"] = (300/3) * index
-			self.settings.motors["pGain"] = 120
+			self.settings.motors["velocity"] = (14000/3) * index
+			self.settings.motors["acceleration"] = (18000/3) * index
+			self.settings.motors["pGain"] = 180
 
-			self.ids.velocitySlider.value = self.settings.motors["velocity"]
-			self.ids.accelerationSlider.value = self.settings.motors["acceleration"]
-			self.ids.pGainSlider.value = self.settings.motors["pGain"]
+			Clock.schedule_once(partial(self.executeString, 'self.ids.velocitySlider.value = self.settings.motors["velocity"]'), .1)
+			Clock.schedule_once(partial(self.executeString, 'self.ids.accelerationSlider.value = self.settings.motors["acceleration"]'), .15)
+			Clock.schedule_once(partial(self.executeString, 'self.ids.pGainSlider.value = self.settings.motors["pGain"]'), .2)
 
+			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
-			self.ids.robotSpeedDropdown.setIndex(index)
+	def executeString(self, string, *args):
+		exec(string)
 
 	def updateStatus(self, *args):
 		# Update everything in status bar		

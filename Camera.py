@@ -35,8 +35,10 @@ class Camera():
 
 	def __init__(self, settings = None): # 320, 192
 		if settings is None:
-			settings = Settings()
-		self.settings = settings
+			settings = Settings('AirHockey_settings.obj')
+			self.settings = settings.camera
+		else:
+			self.settings = settings
 
 		self.piVideo = None
 		self.camera = None
@@ -67,7 +69,7 @@ class Camera():
 		self.unitPuckPosition = Vector2(0, 0)
 		self.unitFilteredPuckPosition = Vector2(0, 0)
 
-		self.filter = Filter(settings["filterConstants"])
+		self.filter = Filter(self.settings["filterConstants"])
 
 		self.callback = self._nothing
 	

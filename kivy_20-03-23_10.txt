@@ -1,0 +1,44 @@
+[INFO   ] Logger: Record log in /home/pi/.kivy/logs/kivy_20-03-23_10.txt
+[INFO   ] Kivy: v1.11.1
+[INFO   ] Kivy: Installed at "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/__init__.py"
+[INFO   ] Python: v3.7.3 (default, Dec 20 2019, 18:57:59) 
+[GCC 8.3.0]
+[INFO   ] Python: Interpreter at "/home/pi/.virtualenvs/ah/bin/python"
+[INFO   ] Factory: 184 symbols loaded
+[DEBUG  ] Cache: register <kv.lang> with limit=None, timeout=None
+[DEBUG  ] Cache: register <kv.image> with limit=None, timeout=60
+[DEBUG  ] Cache: register <kv.atlas> with limit=None, timeout=None
+[INFO   ] Image: Providers: img_tex, img_dds, img_sdl2, img_pil, img_gif (img_ffpyplayer ignored)
+[DEBUG  ] Cache: register <kv.texture> with limit=1000, timeout=60
+[DEBUG  ] Cache: register <kv.shader> with limit=1000, timeout=3600
+[DEBUG  ] Text: Provider <pango> ignored by config
+[INFO   ] Text: Provider: sdl2(['text_pango'] ignored)
+[DEBUG  ] App: Loading kv </home/pi/Documents/PiHockey/Tests/my.kv>
+[DEBUG  ] App: kv </home/pi/Documents/PiHockey/Tests/my.kv> not found
+[DEBUG  ] Window: Ignored <egl_rpi> (import error)
+[INFO   ] Window: Provider: sdl2(['window_egl_rpi'] ignored)
+[DEBUG  ] Window: Ignored <x11> (import error)
+[CRITICAL] Window: Unable to find any valuable Window provider. Please enable debug logging (e.g. add -d if running from the command line, or change the log level in the config) and re-run your app to identify potential causes
+egl_rpi - ImportError: cannot import name 'bcm' from 'kivy.lib.vidcore_lite' (/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/lib/vidcore_lite/__init__.py)
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/__init__.py", line 63, in core_select_lib
+    fromlist=[modulename], level=0)
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/window/window_egl_rpi.py", line 12, in <module>
+    from kivy.lib.vidcore_lite import bcm, egl
+
+sdl2 - RuntimeError: b'Could not initialize EGL'
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/__init__.py", line 71, in core_select_lib
+    cls = cls()
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/window/window_sdl2.py", line 152, in __init__
+    super(WindowSDL, self).__init__()
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/window/__init__.py", line 981, in __init__
+    self.create_window()
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/window/window_sdl2.py", line 290, in create_window
+    self.get_gl_backend_name())
+  File "kivy/core/window/_window_sdl2.pyx", line 224, in kivy.core.window._window_sdl2._WindowSDL2Storage.setup_window
+  File "kivy/core/window/_window_sdl2.pyx", line 74, in kivy.core.window._window_sdl2._WindowSDL2Storage.die
+
+x11 - ModuleNotFoundError: No module named 'kivy.core.window.window_x11'
+  File "/home/pi/.virtualenvs/ah/lib/python3.7/site-packages/kivy/core/__init__.py", line 63, in core_select_lib
+    fromlist=[modulename], level=0)
+
+[CRITICAL] App: Unable to get a Window, abort.

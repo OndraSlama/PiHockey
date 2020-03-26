@@ -43,7 +43,7 @@ class StrategyA(BaseStrategy):
 
 		elif case(ATTACK):
 
-			if self.puck.velocity.x > MAX_SPEED*0.7 or self.puck.position.x > STRIKER_AREA_WIDTH:
+			if self.puck.velocity.x > self.maxSpeed*0.7 or self.puck.position.x > STRIKER_AREA_WIDTH:
 				self.subState = WAITING
 				self.state = DEFEND
 
@@ -76,6 +76,8 @@ class StrategyA(BaseStrategy):
 
 		else:
 			pass
+
+		self.moveIfStuck()
 
 		self.limitMovement()
 

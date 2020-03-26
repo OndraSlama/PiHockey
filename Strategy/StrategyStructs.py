@@ -19,6 +19,7 @@ class StrategyPuck():
 		self.velocity = Vector2(0, 0)
 		self.vector = Vector2(0, 0)
 		self.speedMagnitude = 0
+		self.angle = 0
 		self.timeSinceCaptured = 0
 		self.trajectory = []
 		self.state = state

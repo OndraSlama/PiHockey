@@ -21,6 +21,7 @@ from kivy.uix.screenmanager import ScreenManager, Screen
 from Settings import Settings
 from Camera import Camera
 from Game import Game
+from DataCollector import DataCollector
 from Serial import Serial
 
 import numpy as np
@@ -127,6 +128,7 @@ class RootWidget(BoxLayout):
 	settings = Settings('AirHockey_settings.obj')
 	camera = Camera(settings.camera)
 	game = Game(camera, settings.game)
+	dataCollector = DataCollector(game, camera, settings)
 	serial = Serial(settings.motors)
 	
 

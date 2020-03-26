@@ -3,55 +3,82 @@ import time
 from threading import Thread
 
 class Filter():
-	def __init__(self, constants):
-		self.constants = constants
-	
-		self.raw = Vector2(0, 0)
-		self.diff = Vector2(0, 0)
-		self.addition = Vector2(0, 0)
-		self.prevFiltered = Vector2(0, 0)
-		self.filtered = Vector2(0, 0)
+	def __init__(self, th, lg, hg, isVector = True):
+		self.threshold = th
+		self.lowGain = lg
+		self.highGain = hg
 
-	def filterData(self, data):
-		threshold = self.constants[0]
-		lowGain = self.constants[1]
-		highGain = self.constants[2]
+		if isVector:
+			self.raw = Vector2(0, 0)
+			self.diff = Vector2(0, 0)
+			self.addition = Vector2(0, 0)
+			self.prevFiltered = Vector2(0, 0)
+			self.filtered = Vector2(0, 0)
+		else:
+			self.raw = 0
+			self.diff = 0
+			self.addition = 0
+			self.prevFiltered = 0
+			self.filtered = 0
 
+	def filterData(self, data, cyclic = None):
 		if isinstance(data, Vector2):
-			if data == data:
+			if data == data: # NaN condition
 				self.raw = data		
 				self.diff = self.raw - self.prevFiltered
 
-				if self.diff.magnitude_squared() < threshold**2:
+				if self.diff.magnitude_squared() < self.threshold**2:
 					self.addition = Vector2(0, 0)
-					self.addition.x = (1/lowGain * abs(self.diff.x)/threshold) * self.diff.x			
-					self.addition.y = (1/lowGain * abs(self.diff.y)/threshold) * self.diff.y			
+					self.addition.x = (1/self.lowGain * abs(self.diff.x)/self.threshold) * self.diff.x			
+					self.addition.y = (1/self.lowGain * abs(self.diff.y)/self.threshold) * self.diff.y			
 					# print("Small")
 				else:
 					self.addition = Vector2(0, 0)
-					self.addition.x = 1/highGain * self.diff.x
-					self.addition.y = 1/highGain * self.diff.y
+					self.addition.x = 1/self.highGain * self.diff.x
+					self.addition.y = 1/self.highGain * self.diff.y
 					# print("Big")
 
 				if not isinstance(data, Vector2): self.prevFiltered = Vector2(0, 0)
 				self.filtered = self.prevFiltered + self.addition
 				self.prevFiltered = Vector2(self.filtered)
 			
+		elif cyclic is not None:
+			if data == data:
+				if self.prevFiltered != self.prevFiltered: self.prevFiltered = 0
+
+				flipped = None
+				if abs(self.prevFiltered - data) >= cyclic/2:
+					flipped = cyclic if self.prevFiltered > data else -1* cyclic
+					data += flipped
+
+				self.raw = data		
+				self.diff = self.raw - self.prevFiltered				
+				if abs(self.diff) < self.threshold:
+					self.addition = (1/self.lowGain * abs(self.diff)/self.threshold) * self.diff			
+				else:
+					self.addition = 1/self.highGain * self.diff
+				
+			
+				self.filtered = self.prevFiltered + self.addition		
+				self.prevFiltered = self.filtered
+
 		else:
 			if data == data:
 				if self.prevFiltered != self.prevFiltered: self.prevFiltered = 0
 				self.raw = data		
 				self.diff = self.raw - self.prevFiltered				
-				if abs(self.diff) < threshold:
-					self.addition = (1/lowGain * abs(self.diff)/threshold) * self.diff			
+				if abs(self.diff) < self.threshold:
+					self.addition = (1/self.lowGain * abs(self.diff)/self.threshold) * self.diff			
 				else:
-					self.addition = 1/highGain * self.diff
+					self.addition = 1/self.highGain * self.diff
 				
 			
 				self.filtered = self.prevFiltered + self.addition		
 				self.prevFiltered = self.filtered
 			
+
 		return self.filtered
+
 
 class FPSCounter():
 	def __init__(self, movingAverage = 10, updateEvery = 0.2):

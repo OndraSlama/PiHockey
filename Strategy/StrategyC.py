@@ -15,7 +15,6 @@ class StrategyC(BaseStrategy):
 	def __init__(self):
 		super().__init__()
 		self.description = "Combination of A and B. Slightly advanced mechanics with puck prediction."
-
 		self.actionState = 0
 		self.lineToGoal = Line()
 		self.state = DEFEND
@@ -43,7 +42,7 @@ class StrategyC(BaseStrategy):
 
 		elif case(ATTACK):
 
-			if self.puck.velocity.x > MAX_SPEED*0.7 or self.getPredictedPuckPosition(self.puck.position).x > STRIKER_AREA_WIDTH:
+			if self.puck.velocity.x > self.maxSpeed*0.7 or self.getPredictedPuckPosition(self.puck.position).x > STRIKER_AREA_WIDTH:
 				self.subState = WAITING
 				self.state = DEFEND
 
@@ -96,6 +95,16 @@ class StrategyC(BaseStrategy):
 
 		else:
 			pass
+
+		# 'Always' fucntions
+		pos = self.getPredictedPuckPosition(self.striker.desiredPosition, 1)
+		if self.isPuckBehingStriker(pos) and self.puck.speedMagnitude > 100 and self.state == DEFEND:			
+			self.defendGoalLastLine()
+			self.subState = WAITING
+			self.state = DEFEND
+
+		self.moveIfStuck()
+
 
 
 	# Other functions

@@ -69,7 +69,7 @@ class Camera():
 		self.unitPuckPosition = Vector2(0, 0)
 		self.unitFilteredPuckPosition = Vector2(0, 0)
 
-		self.filter = Filter(self.settings["filterConstants"])
+		self.filter = Filter(*self.settings["filterConstants"])
 
 		self.callback = self._nothing
 	

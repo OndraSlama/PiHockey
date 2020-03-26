@@ -6,18 +6,26 @@ from pygame.math import Vector2
 
 class BaseStrategy():
 	def __init__(self):
+		self.description = "Strategy with no gameplay mechanics."
+		
 		# DEBUG
 		self.debugLines = []
+		self.debugPoints = []
 		self.debugString = ""
-		self.description = "Strategy with no gameplay mechanics."
+
 		# Striker
 		self.striker = StrategyStriker()
 		self.opponentStriker = StrategyStriker()
+
+		# Striker Limits
+		self.maxSpeed = MAX_SPEED
+		self.acceleration = MAX_ACCELERATION
 
 		# Puck
 		self.puck = StrategyPuck()
 		self.puckHistory = []
 		self.puckHistory.append(self.puck)
+		self.lastMove = 0
 
 		# Trajectory info
 		self.goalLineIntersection = 0
@@ -27,7 +35,7 @@ class BaseStrategy():
 		self.historySize = 50
 		self.noOfBounces = 1
 		self.minSpeedLimit = 100
-		self.highAngleTolerance = 70
+		self.highAngleTolerance = 50
 		self.mediumAngleTolerance = 15
 		self.lowAngleTolerance = 8
 		self.positionTolerance = 100
@@ -44,7 +52,7 @@ class BaseStrategy():
 		self.predictedPosition = Vector2(0,0)
 
 		# Filter
-		self.velocityFilter = Filter([3, 2, 1.5])
+		self.angleFilter = Filter(15, 2, 1, isVector=False)
 
 		# Init
 		for i in range(self.historySize - 1):
@@ -53,7 +61,8 @@ class BaseStrategy():
 	#  Main process function -----------------------------------------------------------------------------------
 	def process(self, stepTime):
 		# DEBUG
-		self.debugLines = []
+		self.debugLines = []	
+		self.debugPoints = []
 		# self.debugString = ""
 
 		self.stepTick(stepTime)
@@ -84,16 +93,25 @@ class BaseStrategy():
 		self.calculateTrajectory()	
 
 
-	def initialCheck(self, pos):
-		self.puck.state = ACURATE
+	def initialCheck(self, pos):	
+
 
 		currentStepVector = pos - self.puck.position
+		stepDistance = currentStepVector.magnitude()
+		
+		if self.puck.timeSinceCaptured == 0:
+			stepSpeed = 0
+		else:
+			stepSpeed = stepDistance/self.puck.timeSinceCaptured
+
 		errorAngle = self.getAngleDifference(currentStepVector, self.puck.velocity)
 
 		# Low angle condition
 		if abs(errorAngle) > self.lowAngleTolerance and sign(errorAngle) == self.previousErrorSide:
 			self.capturesWithBadLowAngle += 1
 			if(self.capturesWithBadLowAngle > 4):
+				# print("Low Angle error")
+
 				for i in range(4):
 					self.puckHistory[self.firstUsefull].state = USELESS
 					if self.firstUsefull > 1: self.firstUsefull -= 1
@@ -102,42 +120,85 @@ class BaseStrategy():
 
 		self.previousErrorSide = sign(errorAngle)
 
-		# Medium angle condition
-		if abs(errorAngle) > self.mediumAngleTolerance and sign(errorAngle) == self.previousErrorSide:
-			self.capturesWithBadMediumAngle += 1
-			if(self.capturesWithBadMediumAngle > 3):
-				# print("Low angle condition.. 4 states -> useless")
-				self.capturesWithBadLowAngle = 0	
+		if stepSpeed > 200 and stepDistance > 4 and abs(errorAngle):
+			# Medium angle condition
+			if abs(errorAngle) > self.mediumAngleTolerance and sign(errorAngle) == self.previousErrorSide:
+				self.capturesWithBadMediumAngle += 1
+				if(self.capturesWithBadMediumAngle > 3):
+					# print("Low angle condition.. 4 states -> useless")
+					self.capturesWithBadLowAngle = 0	
+					self.capturesWithBadMediumAngle = 0
+					# print("Medium Angle error")
+					for i in range(3, len(self.puckHistory)):
+						self.puckHistory[i].state = USELESS		
+
+			else:
 				self.capturesWithBadMediumAngle = 0
-				for i in range(3, len(self.puckHistory)):
-					self.puckHistory[i].state = USELESS		
 
-		else:
-			self.capturesWithBadMediumAngle = 0
+			# Debug
+			# if len(self.puck.trajectory) > 0:
+			# trajectoryLine = Line(self.puckHistory[self.firstUsefull].position, self.puck.position)
+			# bounceLine = Line(Vector2(0, sign(pos.y) * (FIELD_HEIGHT/2 - PUCK_RADIUS)), Vector2(FIELD_WIDTH,  sign(pos.y) * (FIELD_HEIGHT/2 - PUCK_RADIUS)))
+			# self.debugLines.append(trajectoryLine)
+			# self.debugLines.append(bounceLine)
+			# self.debugPoints.append(self.getIntersectPoint(trajectoryLine, bounceLine))
 
-		# Angle condition
-		if(abs(errorAngle) > self.highAngleTolerance):
-			self.capturesWithBadLowAngle = 0	
-			self.capturesWithBadMediumAngle = 0	
+			# High angle condition
+			if(abs(errorAngle) > self.highAngleTolerance) or (stepSpeed > 700 and stepDistance > 25 and abs(errorAngle) > self.highAngleTolerance * .4):
+				self.capturesWithBadLowAngle = 0	
+				self.capturesWithBadMediumAngle = 0	
 
-			# print("Angle condition: " + str(errorAngle))
-			for puck in self.puckHistory:
-				puck.state = USELESS
+				# print("Angle condition: " + str(errorAngle))
+				if abs(pos.y) > max(200, FIELD_HEIGHT/2 - (stepDistance * abs(self.puck.vector.y) + PUCK_RADIUS)) and sign(currentStepVector.x) == sign(self.puck.velocity.x) and sign(self.puck.velocity.y) == sign(pos.y) and self.puck.state == ACURATE: # seems like bounce from sidewalls occured
+					trajectoryLine = Line(self.puckHistory[self.firstUsefull].position, self.puck.position)
+					bounceLine = Line(Vector2(0, sign(pos.y) * (FIELD_HEIGHT/2 - PUCK_RADIUS)), Vector2(FIELD_WIDTH,  sign(pos.y) * (FIELD_HEIGHT/2 - PUCK_RADIUS)))
+					self.debugLines.append(trajectoryLine)
+					self.debugLines.append(bounceLine)
+					bouncePoint = self.getIntersectPoint(trajectoryLine, bounceLine)
+					self.puck.position = bouncePoint
+					# print(bouncePoint)
+				for i in range(len(self.puckHistory)):
+					self.puckHistory[i].state = USELESS
+
+					# print("High Angle error: " + str(abs(errorAngle)))
+
 
 		# Quick acceleration - does nothing for now
 		# i = self.firstUsefull - 1
 		# while self.puckHistory[firstUsefull].position.distance_squared_to(self.puckHistory[i].position) < positionTolerance**2:
 		# 	if i <= 1: break
 		# 	i -= 1
-		
-	def setStriker(self, pos):
+	
+	def setStriker(self, pos, velocity = None):
+		if velocity == None:
+			step = pos - self.striker.position
+			velocity = Vector2(step)
+			stepMag = step.magnitude()
+			if stepMag > 0.001:
+				if self.stepTime == 0:
+					velocity.scale_to_length(0)
+				else:
+					velocity.scale_to_length(stepMag / self.stepTime)
+
+		self.striker.velocity = Vector2(velocity)
 		self.striker.position = Vector2(pos)
 
-	def setOpponentStriker(self, pos):
-		self.opponentStriker.position = Vector2(pos)
+	def setOpponentStriker(self, pos, velocity = None):
+		if velocity == None:
+			step = pos - self.opponentStriker.position
+			velocity = Vector2(step)
+			stepMag = step.magnitude()
+			if stepMag > 0.001:
+				if self.stepTime == 0:
+					velocity.scale_to_length(0)
+				else:
+					velocity.scale_to_length(stepMag / self.stepTime)
 
+		self.striker.velocity = Vector2(velocity)
+		self.opponentStriker.position = Vector2(pos)
+		
 	def setPuck(self, pos):
-		self.puck = StrategyPuck(self.puck.state, pos)
+		self.puck = StrategyPuck(ACURATE, pos)
 		self.puckHistory.pop(-1)
 		self.puckHistory.insert(0, self.puck)
 
@@ -145,6 +206,8 @@ class BaseStrategy():
 		while(self.puckHistory[self.firstUsefull].state == USELESS):
 			self.firstUsefull -= 1
 			if self.firstUsefull == 1: break
+
+		# print(self.firstUsefull)
 		
 		if not self.puckHistory[self.firstUsefull].timeSinceCaptured == 0:
 			# if self.firstUsefull > 3:
@@ -152,10 +215,17 @@ class BaseStrategy():
 			self.puck.velocity = stepVector / self.puckHistory[self.firstUsefull].timeSinceCaptured
 
 			# Filter velocity and normal vector
-			self.puck.velocity = self.velocityFilter.filterData(self.puck.velocity)
+			(r, fi) = self.puck.velocity.as_polar()
+			fi = self.angleFilter.filterData(fi, 360)
+			self.puck.velocity.from_polar((r, fi if fi <= 180 else fi - 360))
+			# print("-----")
+			# print(fi)
+			# print(r)
+			# self.puck.velocity = self.velocityFilter.filterData(self.puck.velocity)
 
 			self.puck.vector = self.puck.velocity.normalize()
-			self.puck.speedMagnitude = self.puck.velocity.magnitude()
+			self.puck.speedMagnitude = r
+			self.puck.angle = fi if fi > 0 else 360 - abs(fi)
 		# else:
 			# 	self.puck.state = INACURATE
 
@@ -169,7 +239,7 @@ class BaseStrategy():
 		# if abs(self.puck.vector.y) > 0.9:
 		# 	self.puck.state = INACURATE
 
-		if self.firstUsefull < round(self.historySize/20):
+		if self.puck.speedMagnitude < self.minSpeedLimit * 5 and self.firstUsefull < min(3, round(self.historySize/20)):
 			self.puck.state = INACURATE
 
 
@@ -222,7 +292,7 @@ class BaseStrategy():
 			self.striker.desiredPosition.x = XLIMIT
 
 	def calculateDesiredVelocity(self):
-		gain = (MAX_ACCELERATION/700)
+		gain = (self.acceleration/700)
 		self.striker.desiredVelocity = gain*(self.striker.desiredPosition - self.striker.position)
 
 	# Checkers ------------------------------------------------------------------------------
@@ -341,21 +411,58 @@ class BaseStrategy():
 
 		return self.getIntersectPoint(line, Line(pos - perpendiculatVector, pos + perpendiculatVector))
 
+	def getValueInXYdir(self, dir_x, dir_y, value):
+		if dir_x == 0 and dir_y == 0:
+			return Vector2([value/2,value/2])
+	
+		def map(val, in_min, in_max, out_min, out_max): # maps from interval to other interval
+			return (val - in_min) * (out_max - out_min) / (in_max - in_min) + out_min
+		# dir_x = vektor rychlosti x
+		# dir_y = vektor rychlosti y
+		dir_0 = -dir_x - dir_y
+		dir_1 = dir_x - dir_y
+		absdir_0 = abs(dir_0)
+		absdir_1 = abs(dir_1)
+		bigger = absdir_0 if absdir_0 > absdir_1 else absdir_1
+
+		absdir_0 = map(absdir_0 , 0 , bigger, 0, value)
+		absdir_1 = map(absdir_1 , 0 , bigger, 0, value)
+
+		dir_0 = absdir_0 if dir_0>=0 else -absdir_0
+		dir_1 = absdir_1 if dir_1>=0 else -absdir_1
+
+		return Vector2([round(-dir_0 + dir_1), round(-dir_0 - dir_1)])
+
 	def getPredictedPuckPosition(self, strikerPos = None, reserve=1.3):
 		if strikerPos is None: strikerPos = self.striker.desiredPosition
 		if self.puck.state == INACURATE:
 			return Vector2(self.puck.position)
 		if len(self.puck.trajectory) > 0:
-			dist = self.striker.position.distance_to(strikerPos)
-			time = dist/MAX_SPEED
-			vector = Vector2(self.puck.vector) * (self.puck.speedMagnitude * time)
-			position =  self.puck.position + vector * reserve
-			if position.x < PUCK_RADIUS and abs(position.y) < FIELD_HEIGHT - PUCK_RADIUS:
-				position.x = PUCK_RADIUS
-				position.y = self.goalLineIntersection		
-			self.predictedPosition = position
-			return position
-		return Vector2(0,0)
+			try:
+				step = strikerPos - self.striker.position
+				dist = step.magnitude()
+				# Compute time, that will take striker to move to desired position
+				a = self.getValueInXYdir(step.x, step.y, self.acceleration).magnitude()
+				vm = self.getValueInXYdir(step.x, step.y, self.maxSpeed).magnitude()
+				v0 = sign(self.striker.velocity.dot(step)) * (step * self.striker.velocity.dot(step) / step.dot(step)).magnitude() #self.striker.speedMagnitude * step.normalize()
+				
+				t1 = (vm - v0)/a	
+				d1 = 1/2 * a * t1**2 + v0*t1
+				if d1 > dist:
+					time = max((-v0 + (v0**2 + 2*a*dist)**.5)/a, (-v0 - (v0**2 + 2*a*dist)**.5)/a)
+				else:
+					time = t1 + (dist - d1)/vm
+
+				# time = dist/vm
+				vector = Vector2(self.puck.vector) * (self.puck.speedMagnitude * time)
+				position =  self.puck.position + vector * reserve
+				if position.x < PUCK_RADIUS and abs(position.y) < FIELD_HEIGHT - PUCK_RADIUS:
+					position.x = PUCK_RADIUS
+					position.y = self.goalLineIntersection		
+				self.predictedPosition = position
+				return position
+			except:
+				return Vector2(0,0)
 
 	# Line math ---------------
 	def calculateTrajectory(self):
@@ -434,7 +541,7 @@ class BaseStrategy():
 	# Basic strategy functions used in Process method ---------------------------------------------
 
 	def defendGoalDefault(self):
-		if self.willBounce and self.puck.state == ACURATE and self.puck.vector.x < -0.15:
+		if self.willBounce and self.puck.state == ACURATE and (self.puck.vector.x < -0.5 or (self.puck.vector.x < 0 and self.puck.trajectory[-1].end.x <= PUCK_RADIUS)) and not (self.puck.position.x > FIELD_WIDTH/2 and self.puck.speedMagnitude < 800):
 			if self.puck.trajectory[-1].end.x > XLIMIT + STRIKER_RADIUS:
 				fromPoint = self.puck.trajectory[-1].end
 			else:
@@ -455,8 +562,14 @@ class BaseStrategy():
 			self.setDesiredPosition(Vector2(desiredPosition))
 	
 	def defendGoalLastLine(self):
-		if not self.goalLineIntersection == -10000 and self.puck.state == ACURATE and self.puck.vector.x < 0:
-			blockY = self.goalLineIntersection
+		if self.striker.position.x < self.puck.position.x - PUCK_RADIUS < self.striker.position.x + PUCK_RADIUS + STRIKER_RADIUS:
+			blockY = self.puck.position.y
+		elif not self.goalLineIntersection == -10000 and self.puck.state == ACURATE and self.puck.vector.x < 0:
+			if self.puck.vector.x > -.7:
+				self.defendGoalDefault()
+				return
+			else:
+				blockY = self.goalLineIntersection
 		elif self.puck.state == ACURATE and self.puck.vector.x < 0:
 			blockY = self.puck.trajectory[0].end.y
 		else: 
@@ -478,6 +591,13 @@ class BaseStrategy():
 			self.debugLines.append(Line(self.striker.position, secondPoint))
 			self.setDesiredPosition(self.getIntersectPoint(self.puck.trajectory[0], Line(self.striker.position, secondPoint)))
 	
+	def moveIfStuck(self):
+		if self.puck.speedMagnitude > 100 or self.puck.position.x > STRIKER_AREA_WIDTH + PUCK_RADIUS*.8:
+			self.lastMove = self.gameTime
+
+		if 3 < self.gameTime - self.lastMove < 5:
+			self.setDesiredPosition(self.puck.position)
+
 	def shouldIntercept(self):
 		if len(self.puck.trajectory) == 0:
 			return 0
@@ -488,7 +608,7 @@ class BaseStrategy():
 		if self.puck.position.x > STRIKER_AREA_WIDTH:
 			return True
 
-		if abs(self.puck.velocity.y) > MAX_SPEED:
+		if abs(self.puck.velocity.y) > self.maxSpeed:
 			return True
 
 		if self.willBounce:

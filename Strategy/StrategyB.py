@@ -7,6 +7,7 @@ from Constants import *
 class StrategyB(BaseStrategy):
 	def __init__(self):
 		super().__init__()
+		self.description = "Basic game mechanics. Uses puck position prediction."
 		self.actionState = 0
 		self.lineToGoal = Line()
 		
@@ -22,6 +23,13 @@ class StrategyB(BaseStrategy):
 			self.defendTrajectory()
 		else:
 			self.defendGoalLastLine()
+
+		# 'Always' fucntions
+		pos = self.getPredictedPuckPosition(self.striker.desiredPosition, 1)
+		if self.isPuckBehingStriker(pos) and self.puck.speedMagnitude > 100:			
+			self.defendGoalLastLine()
+
+		self.moveIfStuck()
 
 		self.limitMovement()
 

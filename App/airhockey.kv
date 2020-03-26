@@ -185,6 +185,7 @@
 								disabled: root.playing or not root.homed
 								on_release: 
 									root.game.start()	
+									root.dataCollector.start()
 									root.showStatus("Game started")
 
 							RoundedButton:
@@ -205,6 +206,7 @@
 								disabled: not root.playing and not root.paused
 								on_release: 
 									root.game.stop()
+									root.dataCollector.stop()
 									root.showStatus("Game stopped")
 
 # ------------------------------------- Settings screen --------------------------------------------
@@ -401,7 +403,7 @@
 													text: "Strategy"
 												RoundedDropDown: 
 													id: strategyDropdown
-													size_hint_x: 3
+													size_hint_x: 3													
 													index: root.settings.game["strategy"]
 													values: "Strategy A", "Strategy B", "Strategy C", "Strategy D"
 													on_text: 
@@ -409,6 +411,7 @@
 														root.settings.game["strategy"] = self.values.index(self.text)
 														root.game.setStrategy()
 											SettingsLabel:
+												textMagnitude: .3
 												text: root.strategyDescription
 												halign: "center"
 

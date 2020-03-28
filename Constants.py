@@ -28,6 +28,7 @@ CLOSE_DISTANCE = PUCK_RADIUS # what is considered to be "close enough"
 # Striker limitations
 MAX_ACCELERATION = 10000
 MAX_SPEED = 1000
+KP_GAIN = 5
 
 # -------------- Data collector --------------
 CLIP_LENGTH = 7 #seconds

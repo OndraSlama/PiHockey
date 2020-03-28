@@ -2,6 +2,8 @@
 import time
 from HelperClasses import FPSCounter
 from threading import Thread
+from Constants import *
+from collections import OrderedDict
 
 class DataCollector():
 	def __init__(self, game, camera, settings):
@@ -16,7 +18,7 @@ class DataCollector():
 
 	def reset(self):
 		self.score = [0,0]
-		self.videoFrames = {}
+		self.videoFrames = OrderedDict()
 		self.gameData = GameData()
 
 	def start(self):
@@ -48,7 +50,7 @@ class DataCollector():
 			
 
 			# -----------------------------
-			sleepTime = 1/10 - (time.time() - self._lastCheck)
+			sleepTime = 1/CLIP_FRAMERATE - (time.time() - self._lastCheck)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -63,7 +65,15 @@ class DataCollector():
 
 	def _storeClips(self):
 		for key in self.gameData.goals:
-			self.gameData.clips[key] = [self.videoFrames[key]]
+			self.gameData.clips[key] = self._getCLip(key)
+
+	def _getCLip(self, gameTime):
+		clip = []
+		for key in self.videoFrames:
+			if gameTime - CLIP_LENGTH * CLIP_BEFORE_AFTER_RATIO < key < gameTime + CLIP_LENGTH * (1/CLIP_BEFORE_AFTER_RATIO):
+				clip.append(self.videoFrames[key])
+		return clip
+
 
 
 class GameData():

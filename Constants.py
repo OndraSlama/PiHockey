@@ -29,3 +29,8 @@ CLOSE_DISTANCE = PUCK_RADIUS # what is considered to be "close enough"
 MAX_ACCELERATION = 10000
 MAX_SPEED = 1000
 
+# -------------- Data collector --------------
+CLIP_LENGTH = 7 #seconds
+CLIP_BEFORE_AFTER_RATIO: 7/10 # cant be zero
+CLIP_FRAMERATE = 10
+

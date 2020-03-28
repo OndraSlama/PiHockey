@@ -425,8 +425,8 @@ class BaseStrategy():
 		absdir_1 = abs(dir_1)
 		bigger = absdir_0 if absdir_0 > absdir_1 else absdir_1
 
-		absdir_0 = map(absdir_0 , 0 , bigger, 0, value)
-		absdir_1 = map(absdir_1 , 0 , bigger, 0, value)
+		absdir_0 = map(absdir_0 , 0 , bigger, 0, value/2)
+		absdir_1 = map(absdir_1 , 0 , bigger, 0, value/2)
 
 		dir_0 = absdir_0 if dir_0>=0 else -absdir_0
 		dir_1 = absdir_1 if dir_1>=0 else -absdir_1

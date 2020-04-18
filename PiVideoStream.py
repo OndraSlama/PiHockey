@@ -42,22 +42,25 @@ class PiVideoStream:
 		print("Done")
 
 		print("Camera is running.")
-		for f in self.stream:
-			# grab the frame from the stream and clear the stream in
-			# preparation for the next frame
-			self.frame = f.array
-			self.rawCapture.truncate(0)
-			self.newFrame = True
-			self.counter.tick()
- 
-			# if the thread indicator variable is set, stop the thread
-			# and resource camera resources
-			if self.stopped:
-				self.stream.close()
-				self.rawCapture.close()
-				self.camera.close()
-				print("Camera stopped.")
-				return
+		try:
+			for f in self.stream:
+				# grab the frame from the stream and clear the stream in
+				# preparation for the next frame
+				self.frame = cv2.flip(f.array, 0 )
+				self.rawCapture.truncate(0)
+				self.newFrame = True
+				self.counter.tick()
+	
+				# if the thread indicator variable is set, stop the thread
+				# and resource camera resources
+				if self.stopped:
+					self.stream.close()
+					self.rawCapture.close()
+					self.camera.close()
+					print("Camera stopped.")
+					return
+		except:
+			self.frame = None
 
 	def read(self):
 		# return the frame most recently read

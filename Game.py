@@ -12,6 +12,7 @@ class Game():
 		self.setStrategy()
 
 		self.strikersPosition = [Vector2(0,0), Vector2(0,0)]
+		self.strikersVelocity = [Vector2(0,0), Vector2(0,0)]
 		self.puckPosition = Vector2(0,0)
 
 		self.frequencyCounter = FPSCounter(60)
@@ -30,6 +31,13 @@ class Game():
 		self.winner = -1
 		self.paused = False
 
+		# Statistic data
+		self.onSide = 0
+		self.maxShotSpeed = [0, 0]
+		self.puckControl = [0, 0]
+		self.shotOnGoals = [0, 0]
+		self.lostPucks = [0, 0]
+
 	def setStrategy(self):
 		if self.settings["strategy"] == 0:
 			self.strategy = StrategyA.StrategyA()
@@ -42,17 +50,29 @@ class Game():
 		
 		print(self.strategy.description)
 
-	def setStriker(self, pos):
+	def setStriker(self, pos, vel = None):
 		if isinstance(pos, Vector2):
 			self.strikersPosition[0] = Vector2(pos)
 		else:
 			self.strikersPosition[0] = Vector2(*pos)
 
-	def setOpponentStriker(self, pos):
+		if vel is not None:
+			if isinstance(vel, Vector2):
+				self.strikersVelocity[0] = Vector2(vel)
+			else:
+				self.strikersVelocity[0] = Vector2(*vel)
+
+	def setOpponentStriker(self, pos, vel = None):
 		if isinstance(pos, Vector2):
 			self.strikersPosition[1] = Vector2(pos)
 		else:
 			self.strikersPosition[1] = Vector2(*pos)
+
+		if vel is not None:
+			if isinstance(vel, Vector2):
+				self.strikersVelocity[1] = Vector2(vel)
+			else:
+				self.strikersVelocity[1] = Vector2(*vel)
 
 	def getDesiredPosition(self):
 		return (round(self.strategy.striker.desiredPosition.x), round(self.strategy.striker.desiredPosition.y))
@@ -67,11 +87,13 @@ class Game():
 			self.lastStepAt = time.time()
 
 			self.step(stepTime)
+			self.checkData(stepTime)
 			self.checkEnd()
 
 			sleepTime = 1/self.settings["frequency"] - (time.time() - self.lastStepAt)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
+
 
 			self.gameTime += time.time() - self.lastStepAt
 
@@ -81,16 +103,17 @@ class Game():
 	def step(self, stepTime):
 		if self.camera.newPosition:
 			self.strategy.cameraInput(self.camera.getPuckPosition())
-			self.strategy.setStriker(self.strikersPosition[0])
-			self.strategy.setOpponentStriker(self.strikersPosition[1])
-		try:
-			self.strategy.process(stepTime)	
-		except:
-			print("Error during strategy evaluation.")
+			self.strategy.setStriker(self.strikersPosition[0], self.strikersVelocity[0])
+			self.strategy.setOpponentStriker(self.strikersPosition[1], self.strikersVelocity[1])
+		# try:
+		self.strategy.process(stepTime)	
+		# except Exception as e:
+		# 	print("Strategy: " + str(e))
 		self.frequencyCounter.tick()
 
 	def goal(self, side):
 		self.score[side] += 1
+		self.onSide = 0
 
 	def checkEnd(self):
 		if (self.settings["applyMaxScore"] and (max(self.score) >= self.settings["maxScore"])) or (self.settings["applyMaxTime"] and (self.gameTime >= self.settings["maxTime"])):
@@ -99,6 +122,38 @@ class Game():
 				self.winner = 2
 			else:
 				self.winner = self.score.index(max(self.score))
+
+	def checkData(self, stepTime):	
+		puck = self.strategy.puck
+		puckPos = puck.position
+		if puckPos.x > FIELD_WIDTH - (STRIKER_AREA_WIDTH) and not self.onSide == -1:
+			self.onSide = -1
+			self.lostPucks[1] += 1
+			self.checkShot(1)
+			
+		elif puckPos.x < STRIKER_AREA_WIDTH and not self.onSide == 1:
+			self.onSide = 1
+			self.lostPucks[0] += 1
+			self.checkShot(-1)
+
+		elif abs(puckPos.x - FIELD_WIDTH/2) < (FIELD_WIDTH - 2*(STRIKER_AREA_WIDTH))/2:
+			self.onSide = 0
+
+		if not self.onSide == 0:
+			self.puckControl[max(0, self.onSide)] += stepTime
+
+	def checkShot(self, dir):
+		print("Puck Control:", self.puckControl)
+
+		puck = self.strategy.puck
+		if puck.speedMagnitude > 700 and abs(puck.vector.y) < .9:
+			# print("good shot, dir:", dir)
+			if len(puck.trajectory) > 0 and abs(puck.trajectory[-1].end.y) < GOAL_SPAN/2 * .9:
+				self.shotOnGoals[max(0, dir)] += 1
+				print("Shots on goal: ", self.shotOnGoals)
+			if self.maxShotSpeed[max(0, dir)] < puck.speedMagnitude < 10000:
+				self.maxShotSpeed[max(0, dir)] = puck.speedMagnitude
+				print("Max shot speed:", self.maxShotSpeed)
 
 	def start(self):
 		if self.stopped:
@@ -125,6 +180,7 @@ class Game():
 		# self.infoRepeater.stop()
 		self.paused = True
 		self.stopped = True
+		self.onSide = 0
 
 	def stop(self):
 		self.frequencyCounter.resetState()
@@ -132,7 +188,7 @@ class Game():
 		self.stopped = True
 		self.paused = False
 		self.gameDone = False
-		self.gameTime = 0
+		# self.gameTime = 0
 		# self.reset()
 
 	def printToConsole(self):

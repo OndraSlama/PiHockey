@@ -7,7 +7,7 @@ class Serial():
 	def __init__(self, settings):
 		self.settings = settings
 		# Reading ----
-		self.vector = [0,0]
+		self.vectors = [(0,0), (0,0)]
 		self.status = None
 
 		self._readingLine = ""
@@ -29,7 +29,7 @@ class Serial():
 		self.status = None
 		return output	
 
-	def writeLine(self, txt):
+	def writeLine(self, txt, *args):
 		self._writingLine = txt
 	
 	def writeVector(self, vector, mode):
@@ -48,7 +48,8 @@ class Serial():
 				_num += 1
 				if time.time() - _prevTime > 1:
 					_prevTime = time.time()
-					print(_num)
+					# print(_num)python
+
 					_num = 0
 
 			except:
@@ -83,15 +84,18 @@ class Serial():
 		else:
 			try:
 				# print(txt.split(",")[1:3])
-				# [print(x) for x in txt.split(",")[1:3]]
+				# [print(x) for x in txt.split(",")[1:3]]				
+				i = 0
 				parse = []
-				for x in txt.split(","):
-					try:
-						parse.append(round(float(x)))
-					except: pass
-					# parse = [round(float(x)) for x in txt.split(",")[1:3]]
-					
-				self.vector = parse[0], parse[1]
+				for vector in txt.split(";"):
+					for x in vector.split(","):
+						try:
+							parse.append(round(float(x)))
+						except: pass
+						# parse = [round(float(x)) for x in txt.split(",")[1:3]]
+						
+					self.vectors[i] = (parse[0], parse[1])
+					i += 1
 
 			except Exception as e: 
 				# print(e)
@@ -101,7 +105,8 @@ class Serial():
 
 	def start(self):
 		if self._stopped:
-			self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
+			# self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
+			self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
 			self._ser.flush()
 			self._readingCounter.start()
 			self._writingCounter.start()

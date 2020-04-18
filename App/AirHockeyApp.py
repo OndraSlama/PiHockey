@@ -2,6 +2,7 @@ import kivy
 from kivy.app import App
 from kivy.core.window import Window
 from kivy.uix.button import Button
+from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.gridlayout import GridLayout
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -14,6 +15,7 @@ from kivy.graphics import Color, Ellipse
 from kivy.clock import Clock
 from kivy.animation import Animation
 from kivy.uix.image import Image
+from kivy.uix.image import AsyncImage
 from kivy.graphics.texture import Texture
 from kivy.properties import StringProperty, NumericProperty, ObjectProperty, ListProperty
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -23,6 +25,7 @@ from Camera import Camera
 from Game import Game
 from DataCollector import DataCollector
 from Serial import Serial
+from Constants import *
 
 import numpy as np
 import cv2
@@ -41,6 +44,15 @@ Window.clearcolor = (1, 1, 1, 1)
 Window.fullscreen = True
 
 class RoundedLook(Widget):
+	pass
+
+class RoundedButtonLook(Widget):
+	pass
+
+class RoundedButton(Button,RoundedButtonLook):
+	pass
+
+class RoundedLabel(Label,RoundedLook):
 	pass
 
 class SliderEditor(BoxLayout,RoundedLook):
@@ -123,25 +135,55 @@ class CustomPopup(Popup):
 class WinnerPopup(Popup):
 	pass
 
+class ImagePopup(Popup):
+	def __init__(self, path="icons/no-video.png", **kwargs):
+		super(ImagePopup, self).__init__(**kwargs)
+
+		im = EnlargedViewer(source=path, allow_stretch=True)
+		im.anim_delay = 1/CLIP_FRAMERATE
+		im.animDelay = 1/CLIP_FRAMERATE
+		# im.color=(0,0,0,.6)
+		self.add_widget(im)
+
+class GameRecord(RoundedButton):
+	pass
+
+class HighlightRecord(RoundedButton):
+	pass
+
+class ClipViewer(ButtonBehavior, AsyncImage):
+	pass
+	# def on_release(self):
+	# 	App.get_running_app().root.openPopup("ClipViewer")
+
+class EnlargedViewer(ButtonBehavior, AsyncImage):
+	pass
+        
 
 class RootWidget(BoxLayout):
 	settings = Settings('AirHockey_settings.obj')
 	camera = Camera(settings.camera)
 	game = Game(camera, settings.game)
-	dataCollector = DataCollector(game, camera, settings)
+	dataCollector = DataCollector(game, camera, settings, "GameRecordings/")
 	serial = Serial(settings.motors)
 	
 
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
-		self.changeScreen("settingsScreen") # Initial screen
+		self.changeScreen("infoScreen") # Initial screen
 		self.changeSettingsScreen("otherSettingsScreen")
+		self.changeInfoScreen("matchesInfoScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
+
+		self.prevVel = 0
+		self.prevAcc = 0
+		self.prevGain = 0
 
 		Clock.schedule_interval(self.updateValues, 1/10)
 		Clock.schedule_interval(self.updateCamera, 1/30)
 		Clock.schedule_interval(self.updateCommunication, 1/200)
+		Clock.schedule_interval(self.updateInfo, 1/5)
 
 		self.settings.game["applyMaxTime"]  = True
 		Clock.schedule_once(self.initializeSerial, 1)
@@ -152,6 +194,8 @@ class RootWidget(BoxLayout):
 
 		self.statusScheduler = None
 		self.showStatus("Oh, hi Mark!", 6)
+
+
 
 	def debug(self, *args):
 		if self.playing:
@@ -186,7 +230,7 @@ class RootWidget(BoxLayout):
 			self.openPopup("Camera not working", "Camera not working, check if connected properly and try again or restart the table.", "Try again", lambda x: Clock.schedule_once(self.initializeCamera, 1))
 
 	def openPopup(self, title = "Title", text = "Content", buttonText = "Dismiss", buttonAction = lambda x: print("nothing"), autoDismiss = True):
-		print(text)
+		# print(text)
 		infoPopup = CustomPopup()
 		infoPopup.title = title
 		infoPopup.text = text
@@ -197,6 +241,11 @@ class RootWidget(BoxLayout):
 		infoPopup.separator_color = self.colorTheme
 		infoPopup.open()
 	
+	def openImage(self, path):
+		popup = ImagePopup(path)
+		popup.open()
+
+
 	def openWinnerPopup(self, text = "Content"):
 		winnerPopup = WinnerPopup()
 		winnerPopup.text = text
@@ -218,6 +267,27 @@ class RootWidget(BoxLayout):
 		self.showingStatus = False
 		self.currentStatusText = self.state
 	
+	def changeInfoScreen(self, nextScreen):
+		current = self.ids.infoScreenManager.current
+		screens = ["matchesInfoScreen", "statsInfoScreen", "recordsInfoScreen"]
+		if screens.index(current) < screens.index(nextScreen):
+			direction = "left"
+		else:
+			direction = "right"
+
+		# print(self.controlMode)
+
+		self.ids.infoScreenManager.transition.direction = direction
+		self.ids.infoScreenManager.current = nextScreen
+
+		for button in self.ids.infoNavigationPanel.children:
+			Animation.cancel_all(button, 'roundedCorners', "posHint", "alpha")
+			anim = Animation(roundedCorners=[1,1,1,1], posHint=0, alpha=1, duration=0.5, t="out_back")
+			anim.start(button)
+
+		anim = Animation(roundedCorners=[1,1,0,0], posHint=-.2, alpha=0, duration=0.5, t="out_back")
+		anim.start(self.ids[nextScreen + "Button"])
+
 	def changeSettingsScreen(self, nextScreen):
 		self.settings.saveSettings()
 		current = self.ids.settingsScreenManager.current
@@ -255,6 +325,11 @@ class RootWidget(BoxLayout):
 			direction = "down"
 		
 		self.controlMode = self.ids.otherSettingsScreen.prevMode
+
+		if screenName == "infoScreen":
+			self.dataCollector.loadRecords()
+		else:
+			self.dataCollector.reset()
 		
 		self.ids.screenManager.transition.direction = direction
 		self.ids.screenManager.current = screenName
@@ -289,13 +364,88 @@ class RootWidget(BoxLayout):
 		if not index == 0: 
 			self.settings.motors["velocity"] = (14000/3) * index
 			self.settings.motors["acceleration"] = (18000/3) * index
-			self.settings.motors["pGain"] = 180
-
-			Clock.schedule_once(partial(self.executeString, 'self.ids.velocitySlider.value = self.settings.motors["velocity"]'), .1)
-			Clock.schedule_once(partial(self.executeString, 'self.ids.accelerationSlider.value = self.settings.motors["acceleration"]'), .15)
-			Clock.schedule_once(partial(self.executeString, 'self.ids.pGainSlider.value = self.settings.motors["pGain"]'), .2)
-
+			self.settings.motors["pGain"] = 180			
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
+
+
+	def changeMatch(self, timestamp):
+		for child in self.ids.gameSrollView.children:
+			child.disabled = False
+
+
+		# for child in self.ids.highlightsSrollView.children:
+		self.ids.highlightsSrollView.clear_widgets()
+
+		match = self.dataCollector.getMatchByTimestamp(timestamp)
+		if match == None: return
+
+		self.ids.matchesInfoScreen.timestamp = timestamp
+		self.ids.matchesInfoScreen.score = match.score
+		self.ids.matchesInfoScreen.duration = match.duration
+		self.ids.matchesInfoScreen.shotOnGoals = match.shotOnGoals
+		self.ids.matchesInfoScreen.puckControl = match.puckControl
+		self.ids.matchesInfoScreen.accuracy = match.accuracy
+		self.ids.matchesInfoScreen.topSpeed = [match.humanTopSpeed[1], match.aiTopSpeed[1]]
+
+		# Goal highlights
+		for gameTime in match.goals:	
+			# Insert highlight at the right place
+			index = 0
+			for child in self.ids.highlightsSrollView.children:				
+				if gameTime < child.gameTime:
+					index += 1
+
+			hr = HighlightRecord()
+			hr.gameTime = gameTime
+			hr.uuid = str(match.clips[gameTime])
+			hr.text = "Goal ({:}-{:}) at {:02.0f}:{:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
+			self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		# Top speed ai highlight
+		gameTime = match.aiTopSpeed[0]
+		index = 0
+		for child in self.ids.highlightsSrollView.children:				
+			if gameTime < child.gameTime:
+				index += 1
+
+		hr = HighlightRecord()
+		hr.gameTime = gameTime
+		hr.uuid = str(match.clips[gameTime])
+		hr.text = "TopSpeed - AI ({:.1f} m/s) at {:02.0f}:{:02.0f}".format(match.aiTopSpeed[1]/1000, gameTime//60, gameTime%60)
+		self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		# Top speed human highlight
+		gameTime = match.humanTopSpeed[0]
+		index = 0
+		for child in self.ids.highlightsSrollView.children:				
+			if gameTime < child.gameTime:
+				index += 1
+
+		hr = HighlightRecord()
+		hr.gameTime = gameTime
+		hr.uuid = str(match.clips[gameTime])
+		hr.text = "TopSpeed - HUMAN ({:.1f} m/s) at {:02.0f}:{:02.0f}".format(match.humanTopSpeed[1]/1000, gameTime//60, gameTime%60)
+
+		self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		self.ids.clipViewer.clear_widgets()		
+		im = Image(source="icons/no-video.png")
+		im.color = (0, 0, 0, .6)
+		self.ids.clipViewer.add_widget(im)
+
+	def changeHighlight(self, id):
+		for child in self.ids.highlightsSrollView.children:
+			child.disabled = False
+
+		self.ids.clipViewer.clear_widgets()		
+		im = ClipViewer(source=self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
+		im.uuid = str(id)
+		im.anim_delay = self.ids.matchesInfoScreen.clipFramerate
+		self.ids.clipViewer.add_widget(im)
+
+		# im.source(self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
+		# self.ids.matchesInfoScreen.timestamp = timestamp
+		# print(self.ids.matchesInfoScreen.timestamp)
 
 	def executeString(self, string, *args):
 		exec(string)
@@ -303,6 +453,8 @@ class RootWidget(BoxLayout):
 	def updateStatus(self, *args):
 		# Update everything in status bar		
 		self.setStatus("Idle")
+		if self.dataCollector.loading: self.setStatus("Loading saved clips and game stats...")
+		if self.dataCollector.saving: self.setStatus("Saving game clips and stats...")
 		if not self.homed: self.setStatus("Homing required!")
 		if not self.game.stopped: self.setStatus("Game running...")
 		if self.game.paused: self.setStatus("Game paused")
@@ -314,7 +466,7 @@ class RootWidget(BoxLayout):
 		self.timeString = datetime.now().strftime('%H:%M:%S')
 
 	def updateCommunication(self, *args):
-		self.game.setStriker(self.serial.vector)
+		self.game.setStriker(self.serial.vectors[0], self.serial.vectors[1])
 		if self.controlMode == 1:
 			if self.playing:
 				self.desiredPos = [*self.game.getDesiredPosition()]
@@ -331,6 +483,20 @@ class RootWidget(BoxLayout):
 			self.serial.writeVector(self.desiredMot, "m")
 		# print(self.desiredPos)
 		
+	def updateMotorsParams(self, *args):
+		pass
+		if not self.prevVel == self.settings.motors['velocity']:
+			Clock.schedule_once(partial(self.serial.writeLine, "setmaxspeed,"+str(round(self.settings.motors['velocity']))), .01)
+			self.prevVel = self.settings.motors['velocity']
+
+		if not self.prevAcc == self.settings.motors['acceleration']:		
+			Clock.schedule_once(partial(self.serial.writeLine, "setaccel,"+str(round(self.settings.motors['acceleration']))), .05)
+			self.prevAcc = self.settings.motors['acceleration']
+
+		if not self.prevGain == self.settings.motors['pGain']:		
+			Clock.schedule_once(partial(self.serial.writeLine, "kpgain,"+str(round(self.settings.motors['pGain']))), .09)
+			self.prevGain = self.settings.motors['pGain']
+
 	def updateValues(self, *args):
 		# Debug
 		# print(self.serial._readingCounter.print())
@@ -345,8 +511,13 @@ class RootWidget(BoxLayout):
 		self.colorLimits = [self.camera.settings["lowerLimits"].tolist(), self.settings.camera["upperLimits"].tolist()]
 		self.whiteBalance = self.settings.camera["whiteBalance"]
 		self.puckPos = [round(self.camera.unitFilteredPuckPosition.x), round(self.camera.unitFilteredPuckPosition.y)]
+		# print(self.puckPos)
 		self.puckPixelPos = [*self.camera._toTuple(self.camera._unitsToPixels(self.puckPos))]
-
+		self.trajectory = []
+		for line in self.game.strategy.puck.trajectory:
+			[self.trajectory.append(i) for i in [line.start.x, line.start.y, line.end.x, line.end.y]] 
+		
+		# print(self.trajectory)
 		# Game stuff
 		self.playing = not self.game.stopped
 		self.paused = self.game.paused
@@ -362,13 +533,15 @@ class RootWidget(BoxLayout):
 		# Motors
 		self.readingLine = self.serial._readingLine
 		self.writingLine = self.serial._writingLine
-		self.strikerPos = self.serial.vector
+		self.strikerPos = self.serial.vectors[0]
+		self.strikerVel = self.serial.vectors[1]
 		self.motorStatus = self.serial.status if self.serial.status is not None else ""
 		if self.serial.status is not None: self.homed = False
 		self.comFrequency = self.settings.motors["communicationFrequency"]
 		self.setVelocity = self.settings.motors["velocity"]
 		self.setAcceleration = self.settings.motors["acceleration"]
 		self.setPGain = self.settings.motors["pGain"]
+		self.updateMotorsParams()
 
 		# Strategy stuff
 		self.pixelDesiredPos = self.camera._toTuple(self.camera._unitsToPixels(self.desiredPos)) 
@@ -438,11 +611,40 @@ class RootWidget(BoxLayout):
 				image.fieldCorners = [item for sublist in kivyField for item in sublist]
 				image.puckPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.camera.unitFilteredPuckPosition)))
 				image.desiredPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.game.getDesiredPosition())))
-				image.strikerPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.serial.vector)))
+				image.strikerPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.serial.vectors[0])))
 			
 			else:
 				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
-	
+
+	def updateInfo(self, *args):
+
+		if self.dataCollector.newData:
+			self.dataCollector.newData = False			
+			for game in self.dataCollector.loadedGames:
+				gameTimestamp = game.datetime.timestamp()
+				# Check if record is alredy in list
+				exist = False
+				index = 0
+				for child in self.ids.gameSrollView.children:
+					if child.timestamp == gameTimestamp:
+						exist = True	
+						break					
+					elif gameTimestamp > child.timestamp:
+						index += 1
+				if exist: continue
+
+				gr = GameRecord()
+				gr.timestamp = gameTimestamp
+				winner = "HUMAN" if game.score[0] > game.score[1] else "AI" if game.score[0] < game.score[1] else "TIE"
+				gr.text= "{} - {}".format(winner, game.datetime.strftime('%d.%m.%Y  %H:%M'))
+
+				self.ids.gameSrollView.add_widget(gr, index=index)
+		
+		if not self.dataCollector.saving and not self.dataCollector.loading and self.ids.matchesInfoScreen.timestamp == 0:
+			if len(self.dataCollector.loadedGames) > 0:
+				self.changeMatch((self.dataCollector.getNewestMatch().datetime.timestamp()))
+		
+
 	def testMotors(self):
 		targetPositions = [
 			[50, -250],
@@ -464,7 +666,6 @@ class RootWidget(BoxLayout):
 
 	def setControlMode(self, mode, *args):
 		self.controlMode = mode
-	
 	def setDesiredPos(self, vector, *args):
 		self.desiredPos = vector.copy()
 	def setDesiredVel(self, vector, *args):
@@ -496,6 +697,7 @@ class RootWidget(BoxLayout):
 		if self.game.gameDone:
 			self.game.gameDone = False
 			self.game.stop()
+			self.dataCollector.stop()
 			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
 			self.openWinnerPopup(winner)
 	

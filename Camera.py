@@ -219,7 +219,7 @@ class Camera():
 		print("Detecting...")
 		while True:
 			if self.piVideo.newFrame:				
-				self.frame = self.piVideo.read()
+				self.frame = self.piVideo.read()				
 				self.frameCount += 1
 				self.counter.tick()
 
@@ -474,7 +474,7 @@ class Camera():
 			# print("Calculating transform matrices.")
 			self.prevFieldCorners = fieldCorners.copy()
 			source = np.float32([[point[0] * self.settings["resolution"][0], point[1] * self.settings["resolution"][1]] for point in self.settings["fieldCorners"].tolist()])
-			dst = np.float32([[0, FIELD_HEIGHT/2], [FIELD_WIDTH, FIELD_HEIGHT/2], [FIELD_WIDTH, -FIELD_HEIGHT/2], [0, -FIELD_HEIGHT/2]])
+			dst = np.float32([[0, -FIELD_HEIGHT/2], [FIELD_WIDTH, -FIELD_HEIGHT/2], [FIELD_WIDTH, FIELD_HEIGHT/2], [0, FIELD_HEIGHT/2]])
 			dst = np.array([dst])
 
 			self.p2uTranformMatrix = cv2.getPerspectiveTransform(source, dst)

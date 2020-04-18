@@ -34,9 +34,9 @@ class Settings():
 
 	def resetMotorsSettings(self):
 		self.motors["communicationFrequency"] = 500
-		self.motors["velocity"] = 13000
-		self.motors["acceleration"] = 10000
-		self.motors["pGain"] = 160		
+		self.motors["velocity"] = 1500
+		self.motors["acceleration"] = 20000
+		self.motors["pGain"] = 10		
 
 	def resetGameSettings(self):
 		self.game["maxTime"] = 180

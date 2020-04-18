@@ -3,7 +3,7 @@ from HelperClasses import Filter, Line
 from Constants import *
 from numpy import sign
 from pygame.math import Vector2
-# from Functions import *
+from Functions import *
 
 class BaseStrategy():
 	def __init__(self):
@@ -357,7 +357,7 @@ class BaseStrategy():
 				self.predictedPosition = position
 				return position
 			except:
-				return Vector2(0,0)
+				return Vector2(self.puck.position)
 
 
 	# Line math ---------------

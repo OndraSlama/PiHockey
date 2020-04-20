@@ -8,10 +8,13 @@ class Serial():
 		self.settings = settings
 		# Reading ----
 		self.vectors = [(0,0), (0,0)]
+		self.homed = False
+		self.goal = None
 		self.status = None
 
 		self._readingLine = ""
-		self._writingLine = "ahoj"
+		self._writingLine = ""
+		self._writingQueue = []
 
 		self._prevWrite = ""
 
@@ -22,7 +25,7 @@ class Serial():
 
 		self._stopped = True
 		self._lastRead = 0
-		self._lastWrite = 0
+		self._lastWriteAt = 0
 
 	def readStatus(self):
 		output = self.status
@@ -31,6 +34,9 @@ class Serial():
 
 	def writeLine(self, txt, *args):
 		self._writingLine = txt
+
+	def queueLine(self, txt, *args):
+		self._writingQueue.append(txt)
 	
 	def writeVector(self, vector, mode):
 		self.writeLine("{},{},{}".format(mode,*[*vector].copy()))
@@ -64,14 +70,19 @@ class Serial():
 
 	def _writing(self):
 		while True:
-			self._lastWrite = time.time()
+			self._lastWriteAt = time.time()
 			#print(time.time())
-			if not self._writingLine == self._prevWrite and not self._writingLine == "":
+			textToWrite = self._writingLine
+			if len(self._writingQueue) > 0:
+				textToWrite = self._writingQueue[0]
+				self._writingQueue.pop(0)	
+							
+			if not textToWrite == self._prevWrite and not textToWrite == "":
 				self._writingCounter.tick()
-				self._prevWrite = self._writingLine			
-				self._ser.write((str(self._writingLine) + '\n').encode('ascii'))
+				self._prevWrite = textToWrite			
+				self._ser.write((str(textToWrite) + '\n').encode('ascii'))
 				#print((str(self._writingLine) + '\n'))
-			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWrite)
+			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWriteAt)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -79,15 +90,19 @@ class Serial():
 				return
 
 	def _parseReading(self, txt):
-		if txt == "e1" or txt == "e2" or txt == "e3": 
+		if txt in ["e1", "e2"]:
 			self.status = txt
+		elif txt == "gh" or txt == "gr":
+			self.goal = txt
 		else:
 			try:
 				# print(txt.split(",")[1:3])
 				# [print(x) for x in txt.split(",")[1:3]]				
 				i = 0
 				parse = []
-				for vector in txt.split(";"):
+				splited = txt.split(";")
+				self.homed = bool(int(splited[0]))
+				for vector in splited[1:2]:
 					for x in vector.split(","):
 						try:
 							parse.append(round(float(x)))

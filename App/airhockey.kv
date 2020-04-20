@@ -3,6 +3,7 @@
 #:import Color kivy.graphics.Color
 #:import Animation kivy.animation.Animation
 #:import constants Constants
+#:import Joystick kivy.garden.joystick.Joystick
 
 # Default values ---------------------
 
@@ -54,11 +55,16 @@
 	pixelDesiredPos: [0,0]
 	desiredVel: [0,0]
 
-	# Motors
+	# Table
+	ledsOn: False
+	fansOn: False
+
 	controlMode: 1
 	strikerPos: [0,0]
 	strikerVel: [0,0]
+
 	motorStatus: ""
+	homing: False
 	homed: True
 	writingLine: ""
 	readingLine: ""
@@ -165,6 +171,7 @@
 							id: ai
 							colorTheme: root.colorTheme
 							iconSource: "icons/monitor.png"
+							on_release: root.serial.queueLine("solenoid")
 
 
 					AnchorLayout: # play/pause/stop buttons
@@ -187,8 +194,7 @@
 								iconSource: "icons/play.png"
 								disabled: root.playing or not root.homed
 								on_release: 
-									root.game.start()	
-									root.dataCollector.start()
+									root.startGame()									
 									root.showStatus("Game started")
 
 							RoundedButton:
@@ -208,14 +214,14 @@
 								iconSource: "icons/stop.png"
 								disabled: not root.playing and not root.paused
 								on_release: 
-									root.game.stop()
-									root.dataCollector.stop()
+									root.stopGame()
 									root.showStatus("Game stopped")
 
 # ------------------------------------- Settings screen --------------------------------------------
 			Screen:
 				id: settingsScreen
 				name: "settingsScreen"
+			# ------------------------------------- Navigation buttons --------------------------------------------
 				BoxLayout:
 					# padding: 10	
 					orientation: "vertical"	
@@ -233,7 +239,10 @@
 							pos_hint: {"x": 1, "y": self.posHint}		
 							backgroundColor: sectionBackgroundColor					
 							id: gameSettingsScreenButton
-							text: "Game"
+							iconSource: "icons/play.png"
+							iconSize: .5
+							iconXOff: -55
+							text: "    Game"
 							on_release: root.changeSettingsScreen("gameSettingsScreen")
 
 						RoundedButton:
@@ -241,7 +250,10 @@
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
 							id: cameraSettingsScreenButton
-							text: "Camera"
+							iconSource: "icons/camera.png"
+							iconSize: .5
+							iconXOff: -55
+							text: "      Camera"
 							on_release: root.changeSettingsScreen("cameraSettingsScreen")
 
 						RoundedButton:
@@ -249,17 +261,23 @@
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
 							id: motorsSettingsScreenButton
-							text: "Motors"
+							iconSource: "icons/table.png"
+							iconSize: .5
+							iconXOff: -55
+							text: "     Table"
 							on_release: root.changeSettingsScreen("motorsSettingsScreen")
 
 						RoundedButton:
 							posHint: 0
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
-							id: otherSettingsScreenButton
-							text: "Control"
+							id: controlSettingsScreenButton
+							iconSource: "icons/game.png"
+							iconSize: .5
+							iconXOff: -55
+							text: "      Control"
 							disabled: not root.homed
-							on_release: root.changeSettingsScreen("otherSettingsScreen")
+							on_release: root.changeSettingsScreen("controlSettingsScreen")
 
 					ScreenManager:
 						id: settingsScreenManager
@@ -693,8 +711,8 @@
 													parameter: 'motors["velocity"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.game.strategy.maxSpeed = self.currentValue
-
+														root.game.strategy.maxSpeed = self.currentValue														
+														root.serial.queueLine("setmaxspeed,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 
 											BoxLayout:
@@ -714,6 +732,7 @@
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
 														root.game.strategy.acceleration = self.currentValue
+														root.serial.queueLine("setaccel,"+str(round(self.currentValue)))
 													
 													colorTheme: root.colorTheme
 
@@ -734,6 +753,7 @@
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
 														root.game.strategy.gain = self.currentValue
+														root.serial.queueLine("kpgain,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 									BoxLayout:
 										size_hint_y: .4
@@ -747,19 +767,20 @@
 											text: "Home"
 											textMagnitude: .35
 											on_release:
-												app.root.serial.writeLine("home")
+												app.root.serial.queueLine("home")
+												root.homing = True
 										RoundedButton:
 											text: "Test"
 											disabled: not root.homed
 											textMagnitude: .35
 											on_release:
-												app.root.serial.writeLine("demo")
+												app.root.serial.queueLine("demo")
 										RoundedSwitchButton:
 											size_hint_x: 1.5
 											textMagnitude: .3
 											text: "    Caution\n    mode"
 											on_release:
-												app.root.serial.writeLine("preventwallhit,1") if self.isDown else app.root.serial.writeLine("preventwallhit,0")
+												app.root.serial.queueLine("preventwallhit,1") if self.isDown else app.root.serial.queueLine("preventwallhit,0")
 
 									
 								Image: 
@@ -790,11 +811,47 @@
 										x: field.x + field.width/2 - self.width/2 + (field.pusherX/300) * 621/800 * field.width/2#(slider.width - self.width)/2
 										y: slider.y + (slider.height - self.height)*0.7
 										source: "images/pusher.png"
+
+									RoundedButton:
+										size: 60, 60
+										x: field.x + (field.width - self.width)/2
+										y: field.y + (field.height - self.height)/2 + 170
+										# text: "goal"
+										alpha: .7
+										iconSource: "icons/goalclear.png"
+										iconSize: .6
+										on_release: root.serial.queueLine("solenoid")
+
+									RoundedSwitchButton:
+										id: ledsToggle
+										size: 60, 60
+										x: field.x + (field.width - self.width)/2
+										y: field.y + (field.height - self.height)/2
+										showDot: False
+										iconSource: "icons/light.png"
+										iconSize: .6
+										alpha: .7
+										on_release: root.setLeds(self.isDown)
+
+									RoundedSwitchButton:
+										id: fansToggle
+										size: 60, 60
+										x: field.x + (field.width - self.width)/2
+										y: field.y + (field.height - self.height)/2 - 90
+										# pos_hint: {"center_x": .5, "center_y": .5}
+										showDot: False
+										iconSource: "icons/fan2.png"
+										iconSize: .6
+										alpha: .7
+										on_release: root.setFans(self.isDown)
+
+									
+
 								
 			# ------------------------------------- Control screen --------------------------------------------
 						SubScreen:
-							id: otherSettingsScreen
-							name: "otherSettingsScreen"	
+							id: controlSettingsScreen
+							name: "controlSettingsScreen"	
 							prevMode: 1
 							# BoxLayout:
 							ControlField: 
@@ -852,6 +909,32 @@
 									y: controlField.y +  controlField.height/2 - self.height/2 + (root.puckPos[1]/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
 									source: "images/puck.png"
 									color: root.colorTheme
+
+								# BoxLayout:
+								# 	id: joystickBox
+								Joystick:
+									id: joystick
+									size: 150,150
+									x: controlField.x + (controlField.width - self.width)/2 + controlField.width * .22
+									y: controlField.y + (controlField.height - self.height)/2
+
+									sticky: False
+									outer_size: 1
+									inner_size: 0.6
+									pad_size:   0.5
+									outer_line_width: 0.005
+									inner_line_width: 0.0
+									pad_line_width:   0.0
+									outer_background_color: (0.75, 0.75, 0.75, 0.3)
+									outer_line_color:       (0.25, 0.25, 0.25, 0.3)
+									inner_background_color: (0.75, 0.75, 0.75, 0.1)
+									inner_line_color:       (0.7,  0.7,  0.7,  0.1)
+									pad_background_color:   (0.4,  0.4,  0.4,  0.3)
+									pad_line_color:         (0.35, 0.35, 0.35, 0.3)
+
+									on_pad:
+										controlField.joystickControl(self.pad, self.magnitude)
+										
 
 
 
@@ -1340,6 +1423,7 @@
 <RoundedSwitchButton@ToggleButton+RoundedButtonLook>:
 	background_color: [0, 0, 0, 0]
 	disabled_color: disabledTextColor
+	showDot: True
 	textMagnitude: .4
 	font_size: self.height *self.textMagnitude
 	background_normal: ""
@@ -1347,7 +1431,7 @@
 	isDown: not self.state == 'normal'
 	canvas.before:
 		Color:
-			rgba: buttonIconsColor if self.state == 'normal' else buttonColor
+			rgba: [0,0,0,0] if not self.showDot else buttonIconsColor if self.state == 'normal' else buttonColor
 		Ellipse:
 			pos: [self.x + self.height/2 - self.height/10, self.y + self.height/2 - self.height/10]
 			size: [self.height/5, self.height/5]
@@ -1559,7 +1643,7 @@
 					text: "Play again"
 					on_press: 
 						root.dismiss()
-						app.root.game.start()
+						root.startGame()
 					
 
 <ImagePopup>:
@@ -1811,7 +1895,7 @@
 		self.disabled = True
 
 # Score overview --------------------------------------------------------
-<ScoreOverview@BoxLayout>:
+<ScoreOverview@ButtonBehavior+BoxLayout>:
 	orientation: "vertical"
 	value: 0
 	portion: 0
@@ -1833,6 +1917,7 @@
 			colorTheme: root.colorTheme
 			text: str(root.value)
 			portion: root.portion
+
 # ComparisionTuple section --------------------------------------------------------
 <ComparisionTuple@SubSection>:
 	title: "Title"

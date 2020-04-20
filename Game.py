@@ -19,14 +19,18 @@ class Game():
 		self.infoRepeater = Repeater(self.printToConsole, 0.2)
 		self.gameStartedAt = 0
 		self.lastStepAt = 0
+		self.lastGoalAt = 0		
+		self.clearRobotGoal = 0
 		self.paused = False
 		self.stopped = True
+		self.waitForPuck = True
 
 		self.reset()
 
 	def reset(self):
 		self.gameTime = 0
 		self.score = [0, 0]
+		self.lastGoalOnSide = -1
 		self.gameDone = False
 		self.winner = -1
 		self.paused = False
@@ -94,26 +98,34 @@ class Game():
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
-
-			self.gameTime += time.time() - self.lastStepAt
+			if not self.waitForPuck:
+				self.gameTime += time.time() - self.lastStepAt
 
 			if self.stopped:				
 				return
 
 	def step(self, stepTime):
 		if self.camera.newPosition:
-			self.strategy.cameraInput(self.camera.getPuckPosition())
+			pos = self.camera.getPuckPosition()
+			if pos.x > STRIKER_RADIUS * 1.5:
+				self.waitForPuck = False
+			self.strategy.cameraInput(pos)
 			self.strategy.setStriker(self.strikersPosition[0], self.strikersVelocity[0])
 			self.strategy.setOpponentStriker(self.strikersPosition[1], self.strikersVelocity[1])
 		# try:
-		self.strategy.process(stepTime)	
-		# except Exception as e:
-		# 	print("Strategy: " + str(e))
-		self.frequencyCounter.tick()
+		if not self.waitForPuck:
+			self.strategy.process(stepTime)	
+			# except Exception as e:
+			# 	print("Strategy: " + str(e))
+			self.frequencyCounter.tick()
 
 	def goal(self, side):
-		self.score[side] += 1
-		self.onSide = 0
+		if time.time() - self.lastGoalAt > 2 and not self.waitForPuck:
+			self.lastGoalAt = time.time()
+			self.lastGoalOnSide = side
+			self.score[side] += 1
+			self.onSide = 0
+			self.waitForPuck = True
 
 	def checkEnd(self):
 		if (self.settings["applyMaxScore"] and (max(self.score) >= self.settings["maxScore"])) or (self.settings["applyMaxTime"] and (self.gameTime >= self.settings["maxTime"])):
@@ -123,24 +135,25 @@ class Game():
 			else:
 				self.winner = self.score.index(max(self.score))
 
-	def checkData(self, stepTime):	
-		puck = self.strategy.puck
-		puckPos = puck.position
-		if puckPos.x > FIELD_WIDTH - (STRIKER_AREA_WIDTH) and not self.onSide == -1:
-			self.onSide = -1
-			self.lostPucks[1] += 1
-			self.checkShot(1)
-			
-		elif puckPos.x < STRIKER_AREA_WIDTH and not self.onSide == 1:
-			self.onSide = 1
-			self.lostPucks[0] += 1
-			self.checkShot(-1)
+	def checkData(self, stepTime):
+		if not self.waitForPuck:
+			puck = self.strategy.puck
+			puckPos = puck.position
+			if puckPos.x > FIELD_WIDTH - (STRIKER_AREA_WIDTH) and not self.onSide == -1:
+				self.onSide = -1
+				self.lostPucks[1] += 1
+				self.checkShot(1)
+				
+			elif puckPos.x < STRIKER_AREA_WIDTH and not self.onSide == 1:
+				self.onSide = 1
+				self.lostPucks[0] += 1
+				self.checkShot(-1)
 
-		elif abs(puckPos.x - FIELD_WIDTH/2) < (FIELD_WIDTH - 2*(STRIKER_AREA_WIDTH))/2:
-			self.onSide = 0
+			elif abs(puckPos.x - FIELD_WIDTH/2) < (FIELD_WIDTH - 2*(STRIKER_AREA_WIDTH))/2:
+				self.onSide = 0
 
-		if not self.onSide == 0:
-			self.puckControl[max(0, self.onSide)] += stepTime
+			if not self.onSide == 0:
+				self.puckControl[max(0, self.onSide)] += stepTime
 
 	def checkShot(self, dir):
 		print("Puck Control:", self.puckControl)

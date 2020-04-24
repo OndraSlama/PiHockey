@@ -120,8 +120,8 @@ class Serial():
 
 	def start(self):
 		if self._stopped:
-			# self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
-			self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
+			self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
+			#self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
 			self._ser.flush()
 			self._readingCounter.start()
 			self._writingCounter.start()

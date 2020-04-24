@@ -31,7 +31,7 @@ MAX_SPEED = 1000
 KP_GAIN = 5
 
 # -------------- Data collector --------------
-CLIP_LENGTH = 4 #seconds
+CLIP_LENGTH = 5 #seconds
 CLIP_BEFORE_AFTER_RATIO = 7/10 # cant be zero
 CLIP_FRAMERATE = 10
 

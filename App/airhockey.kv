@@ -108,11 +108,12 @@
 				on_press: root.changeScreen("playScreen")				
 			NavigationButton:
 				id: settingsScreenButton
-				iconSource:"icons/settings.png"
+				iconSource:"icons/settings4.png"
 				on_press: root.changeScreen("settingsScreen")
 			NavigationButton:
 				id: cameraScreenButton
-				iconSource:"icons/camera.png"
+				iconSize: .5
+				iconSource:"icons/camera2.png"
 				on_press: root.changeScreen("cameraScreen")
 			NavigationButton:
 				id: infoScreenButton
@@ -134,7 +135,7 @@
 						padding: [30, 30, 30, 0]
 
 						ScoreOverview:
-							value: root.score[0]
+							value: root.score[1]
 							id: human
 							colorTheme: root.colorTheme
 							iconSource: "icons/human.png"
@@ -167,7 +168,7 @@
 								portion: (root.gameTime%60)/60 if root.gameTimeRemaining == -1 else root.gameTimeRemaining / root.settings.game["maxTime"]
 
 						ScoreOverview:
-							value: root.score[1]
+							value: root.score[0]
 							id: ai
 							colorTheme: root.colorTheme
 							iconSource: "icons/monitor.png"
@@ -250,7 +251,7 @@
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
 							id: cameraSettingsScreenButton
-							iconSource: "icons/camera.png"
+							iconSource: "icons/camera2.png"
 							iconSize: .5
 							iconXOff: -55
 							text: "      Camera"
@@ -853,7 +854,8 @@
 							id: controlSettingsScreen
 							name: "controlSettingsScreen"	
 							prevMode: 1
-							# BoxLayout:
+							# BoxLayout:	
+						#----------------------------- Control field -----------------------------						
 							ControlField: 
 								id: controlField
 								size_hint_x: None
@@ -873,7 +875,7 @@
 										points: root.trajectory
 										width: 2
 
-						
+							#----------------------------- Slider -----------------------------
 								Image: 
 									id: controlSlider
 									height: controlField.height * 799/885
@@ -881,7 +883,7 @@
 									x: controlField.x + (controlField.width * 131/1296 - self.width*0.58) + (controlField.pusherX/1000) * 1034/1296 * controlField.width
 									y: controlField.y + (controlField.height - self.height)/2
 									source: "images/slider_landscape.png"	
-						
+							#----------------------------- Striker -----------------------------
 								Image:
 									id: controlStriker
 									width: controlSlider.width * 110/83
@@ -890,7 +892,7 @@
 									x: controlSlider.x + (controlSlider.width - self.width)*0.32
 									y: controlField.y +  controlField.height/2 - self.height/2 + (controlField.pusherY/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
 									source: "images/pusher_landscape.png"
-
+							#----------------------------- Target -----------------------------
 								Image:
 									id: controlTarget
 									size: controlStriker.size
@@ -900,6 +902,17 @@
 									source: "icons/target.png"
 									color: root.colorTheme
 
+
+									RoundedLabel:
+										size: controlTarget.width * 2.2, controlTarget.height*1
+										textMagnitude: .32
+										# pos_hint: {'center_x': .5, 'center_y': .5}
+										# pos_hint: {'x': 1, 'y': 1}
+										x: self.parent.x + (self.parent.width - self.width)/2 + self.width * .8
+										y: self.parent.y + (self.parent.height - self.height)/2
+										text: "x: {:4}\ny: {:4}".format(*root.desiredPos)
+										
+							#----------------------------- Puck -----------------------------
 								Image:
 									id: controlPuck
 									width: controlStriker.width * 32/50
@@ -909,14 +922,14 @@
 									y: controlField.y +  controlField.height/2 - self.height/2 + (root.puckPos[1]/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
 									source: "images/puck.png"
 									color: root.colorTheme
-
+							#----------------------------- Joystick -----------------------------
 								# BoxLayout:
 								# 	id: joystickBox
 								Joystick:
 									id: joystick
 									size: 150,150
 									x: controlField.x + (controlField.width - self.width)/2 + controlField.width * .22
-									y: controlField.y + (controlField.height - self.height)/2
+									y: controlField.y + (controlField.height - self.height)/2 - controlField.height * .13
 
 									sticky: False
 									outer_size: 1
@@ -934,6 +947,16 @@
 
 									on_pad:
 										controlField.joystickControl(self.pad, self.magnitude)
+
+									RoundedLabel:
+										size: self.parent.width , self.parent.height*.7
+										textMagnitude: .17
+										roundMagnitude: .65									
+										# pos_hint: {'center_x': .5, 'center_y': .5}
+										# pos_hint: {'x': 1, 'y': 1}
+										x: self.parent.x + (self.parent.width - self.width)/2 
+										y: self.parent.y + (self.parent.height - self.height)/2 + self.height*1.35
+										text: "Speed control\nx: {:4.0f}\ny: {:4.0f}".format(*root.desiredVel)
 										
 
 
@@ -1130,7 +1153,7 @@
 				BoxLayout:
 					# padding: 10	
 					orientation: "vertical"	
-
+				#----------------------------- Navigation buttons -----------------------------
 					BoxLayout: # button above info screens	
 						id: infoNavigationPanel		
 						size_hint_y: None
@@ -1144,7 +1167,10 @@
 							pos_hint: {"x": 1, "y": self.posHint}		
 							backgroundColor: sectionBackgroundColor					
 							id: matchesInfoScreenButton
-							text: "Matches"
+							text: "   Matches"
+							iconSource: "icons/matches.png"
+							# iconSize: .5
+							iconXOff: -60
 							on_release: root.changeInfoScreen("matchesInfoScreen")
 
 						RoundedButton:
@@ -1152,16 +1178,19 @@
 							pos_hint: {"x": 1, "y": self.posHint}	
 							backgroundColor: sectionBackgroundColor					
 							id: statsInfoScreenButton
-							text: "Statistics"
+							text: "   Statistics"
+							iconSource: "icons/graph2.png"
+							iconSize: .5
+							iconXOff: -60
 							on_release: root.changeInfoScreen("statsInfoScreen")
 
-						RoundedButton:
-							posHint: 0
-							pos_hint: {"x": 1, "y": self.posHint}	
-							backgroundColor: sectionBackgroundColor					
-							id: recordsInfoScreenButton
-							text: "Records"
-							on_release: root.changeInfoScreen("recordsInfoScreen")
+						# RoundedButton:
+						# 	posHint: 0
+						# 	pos_hint: {"x": 1, "y": self.posHint}	
+						# 	backgroundColor: sectionBackgroundColor					
+						# 	id: recordsInfoScreenButton
+						# 	text: "Records"
+						# 	on_release: root.changeInfoScreen("recordsInfoScreen")
 
 					ScreenManager:
 						id: infoScreenManager
@@ -1208,11 +1237,11 @@
 												# padding: [30, 30, 30, 0]
 
 												ScoreOverview:
-													value: matchesInfoScreen.score[0]
+													value: matchesInfoScreen.score[1]
 													colorTheme: root.colorTheme
 													iconSource: "icons/human.png"
 													iconSize: .9
-													portion: matchesInfoScreen.score[0]/max(*matchesInfoScreen.score, 1)
+													portion: matchesInfoScreen.score[1]/max(*matchesInfoScreen.score, 1)
 
 												AnchorLayout:
 													anchor_x:"center"
@@ -1240,10 +1269,10 @@
 														portion: 1
 
 												ScoreOverview:
-													value: matchesInfoScreen.score[1]
+													value: matchesInfoScreen.score[0]
 													colorTheme: root.colorTheme
 													iconSource: "icons/monitor.png"
-													portion: matchesInfoScreen.score[1]/max(*matchesInfoScreen.score, 1)
+													portion: matchesInfoScreen.score[0]/max(*matchesInfoScreen.score, 1)
 
 
 										BoxLayout:
@@ -1378,6 +1407,8 @@
 	roundMagnitude: 1
 	iconColor: iconColor
 	iconSize: 0.45
+	iconXSize: 1
+	iconYSize: 1
 	iconXOff: 0
 	iconYOff: 0
 	roundedCorners: [1,1,1,1]
@@ -1401,7 +1432,7 @@
 			rgba: [1,1,1,0] if root.iconSource == "" else (disabledIconColor if self.disabled else self.iconColor if self.iconColor is not None else iconColor)
 		Rectangle:
 			pos: [root.center_x - (root.size[1] * root.iconSize)/2 + root.iconXOff,  root.center_y - (root.size[1] * root.iconSize)/2 + root.iconYOff]
-			size: [(root.size[1] * root.iconSize), (root.size[1] * root.iconSize)]
+			size: [(root.size[1] * root.iconSize * root.iconXSize), (root.size[1] * root.iconSize * root.iconYSize)]
 			source: root.iconSource
 
 <RoundedLook>:
@@ -1879,6 +1910,8 @@
 	height: 40
 	text: "Recorded game"
 	textMagnitude: .35
+	iconXOff: -80
+	iconSize: .5
 	on_release:
 		app.root.changeMatch(self.timestamp)
 		self.disabled = True
@@ -1890,6 +1923,8 @@
 	height: 40
 	text: "{:02.0f}:{:02.0f}".format(self.gameTime//60, self.gameTime%60)
 	textMagnitude: .35
+	iconXOff: -90
+	iconSize: .5
 	on_release:
 		app.root.changeHighlight(self.uuid)
 		self.disabled = True

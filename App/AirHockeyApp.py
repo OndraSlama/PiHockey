@@ -43,7 +43,7 @@ EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
 Window.size = (938, 550)
-# Window.fullscreen = True
+Window.fullscreen = True
 #----------------------------- Widget definitions -----------------------------
 class RoundedLook(Widget):
 	pass
@@ -85,7 +85,7 @@ class ControlField(Image):
 		fieldPos = self.getFieldPos([touch.x, touch.y])
 		app = App.get_running_app()
 
-		if 0 < fieldPos[0] < 500 and abs(fieldPos[1]) < 300:
+		if XLIMIT < fieldPos[0] < STRIKER_AREA_WIDTH and abs(fieldPos[1]) < YLIMIT:
 			self.mode = 3
 			app.root.controlMode = 3
 			app.root.desiredPos = fieldPos.copy()
@@ -98,7 +98,7 @@ class ControlField(Image):
 			fieldPos = self.getFieldPos([touch.x,  touch.y])
 
 			app = App.get_running_app()
-			app.root.desiredPos = [max(0, min(500, fieldPos[0])), max(-300, min(300,fieldPos[1])) ]
+			app.root.desiredPos = [max(XLIMIT, min(STRIKER_AREA_WIDTH, fieldPos[0])), max(-YLIMIT, min(YLIMIT,fieldPos[1])) ]
 		return super(ControlField, self).on_touch_move(touch) # propagate further
 
 	def on_touch_up(self, touch):
@@ -188,7 +188,7 @@ class RootWidget(BoxLayout):
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
-		self.changeScreen("settingsScreen") # Initial screen
+		self.changeScreen("infoScreen") # Initial screen
 		self.changeSettingsScreen("controlSettingsScreen")
 		self.changeInfoScreen("matchesInfoScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
@@ -226,61 +226,6 @@ class RootWidget(BoxLayout):
 		except:
 			self.cameraConnected = False
 			self.openPopup("Camera not working", "Camera not working, check if connected properly and try again or restart the table.", "Try again", lambda x: Clock.schedule_once(self.initializeCamera, 1))
- 
- #----------------------------- Info -----------------------------
-	def openPopup(self, title = "Title", text = "Content", buttonText = "Dismiss", buttonAction = lambda x: print("nothing"), autoDismiss = True):
-		# print(text)
-		infoPopup = CustomPopup()
-		infoPopup.title = title
-		infoPopup.text = text
-		infoPopup.buttonText = buttonText
-		infoPopup.auto_dismiss = autoDismiss
-		infoPopup.onPress = buttonAction
-
-		infoPopup.separator_color = self.colorTheme
-		infoPopup.open()
-	
-	def openImage(self, path):
-		popup = ImagePopup(path)
-		popup.open()
-
-	def openWinnerPopup(self, text = "Content"):
-		winnerPopup = WinnerPopup()
-		winnerPopup.text = text
-		winnerPopup.open()
-
-	def showStatus(self, text, time=1):
-		if self.statusScheduler is not None:
-			Clock.unschedule(self.statusScheduler)
-		self.showingStatus = True
-		self.currentStatusText = text
-		self.statusScheduler = Clock.schedule_once(self.resetStatus, time)
-
-	def setStatus(self, text):
-		self.state = text
-		if not self.showingStatus:			
-			self.currentStatusText = self.state
-
-	def resetStatus(self, *args):
-		self.showingStatus = False
-		self.currentStatusText = self.state
-	
-	def updateStatus(self, *args):
-		# Update everything in status bar		
-		self.setStatus("Idle")
-		if self.dataCollector.loading: self.setStatus("Loading saved clips and game stats...")
-		if self.dataCollector.saving: self.setStatus("Saving game clips and stats...")
-		if not self.homed: self.setStatus("Homing required!")
-		if self.homing: self.setStatus("Homing...")
-		if not self.game.stopped: self.setStatus("Game running...")
-		if self.game.paused: self.setStatus("Game paused")
-		if not self.game.stopped and self.game.waitForPuck: self.setStatus("Waiting for puck...")
-		if self.ids.cameraStream.calibratingField: self.setStatus("Calibrating field...")
-		if not self.camera.analyzingStopped: self.setStatus("Analyzing most dominant color...")
-		if not self.camera.lockingAwbStopped: self.setStatus("Adjusting white balance...")
-
-		self.dateString = datetime.now().strftime('%d.%m.%Y')
-		self.timeString = datetime.now().strftime('%H:%M:%S')
  
  #----------------------------- Screen managers -----------------------------
 	def changeInfoScreen(self, nextScreen):
@@ -369,6 +314,7 @@ class RootWidget(BoxLayout):
 			anim2 = Animation(portion=min(1,max(0, score[1] - score[0])), duration=0.5, t="out_back")
 			anim1.start(player)
 			anim2.start(opponent)
+ 
  #----------------------------- Settings screen management -----------------------------
 	def changeDifficulty(self, index):
 		self.settings.game["difficulty"] = index
@@ -395,6 +341,184 @@ class RootWidget(BoxLayout):
 			self.settings.motors["acceleration"] = (18000/3) * index
 			self.settings.motors["pGain"] = 180			
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
+
+ #----------------------------- Camera screen management -----------------------------
+	def updateCameraScreen(self, *args):
+		# Update settings screen
+		if self.ids.settingsScreenManager.current == "cameraSettingsScreen":
+			image = self.ids.maskSettingsStream
+			texture = self.imageToTexture(self.camera.filteredMask, "luminance")
+			if texture is not None:
+				self.cameraConnected = True
+				image.texture = texture
+			else:
+				self.cameraConnected = False
+				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
+
+			image = self.ids.frameSettingsStream
+			texture = self.imageToTexture(self.camera.frame, "bgr")
+			if texture is not None:
+				image.texture = texture
+			else:
+				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
+			
+		# Update camera screen
+		def cv2kivy(point):
+			return (image.x + point[0]/self.cameraResolution[0] * image.width, image.y + point[1]/self.cameraResolution[1] * image.height)
+			
+		# Update camera frame and everything camera can see in cameraScreen
+		image = self.ids.cameraStream
+
+		if self.ids.screenManager.current == "cameraScreen":
+			if image.showing == "Frame":
+				frame = self.camera.frame
+				frameFormat = "bgr"
+			elif image.showing == "Mask":
+				frame = self.camera.mask
+				frameFormat = "luminance"
+			elif image.showing == "Filtered mask":
+				frame = self.camera.filteredMask
+				frameFormat = "luminance"
+
+			texture = self.imageToTexture(frame, frameFormat)
+			if texture is not None:
+				image.texture = texture				
+				kivyField = [cv2kivy((point[0] * self.settings.camera["resolution"][0], point[1] * self.settings.camera["resolution"][1])) for point in self.settings.camera["fieldCorners"].tolist()]	
+				# print(kivyField)			
+				image.fieldCorners = [item for sublist in kivyField for item in sublist]
+				image.puckPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.camera.unitFilteredPuckPosition)))
+				image.desiredPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.game.getDesiredPosition())))
+				image.strikerPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.serial.vectors[0])))
+			
+			else:
+				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
+
+	def imageToTexture(self, frame, frameFormat="bgr"):
+		# Convert numpy array frame to kivy texture
+		texture = None
+		if frame is not None:
+			texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt=frameFormat)
+			texture.blit_buffer(frame.flatten(), colorfmt=frameFormat, bufferfmt='ubyte')
+		return texture	
+ 
+ #----------------------------- Info screen management ----------------------------- 
+	def updateInfoScreen(self, *args):
+
+		if self.dataCollector.newData:
+			self.dataCollector.newData = False			
+			for game in self.dataCollector.loadedGames:
+				gameTimestamp = game.datetime.timestamp()
+				# Check if record is alredy in list
+				exist = False
+				index = 0
+				for child in self.ids.gameSrollView.children:
+					if child.timestamp == gameTimestamp:
+						exist = True	
+						break					
+					elif gameTimestamp > child.timestamp:
+						index += 1
+				if exist: continue
+
+				gr = GameRecord()
+				gr.timestamp = gameTimestamp
+				winnerIcon = "icons/monitor.png" if game.score[0] > game.score[1] else "icons/human.png" if game.score[0] < game.score[1] else "icons/tie2.png"
+				gr.iconSource = winnerIcon
+				gr.text= "     {1:2} -{0:2}      {2:}".format(*game.score, game.datetime.strftime('%d.%m.%y %H:%M'))
+
+				self.ids.gameSrollView.add_widget(gr, index=index)
+		
+		if not self.dataCollector.saving and not self.dataCollector.loading and self.ids.matchesInfoScreen.timestamp == 0:
+			if len(self.dataCollector.loadedGames) > 0:
+				self.changeMatch((self.dataCollector.getNewestMatch().datetime.timestamp()))
+
+	def changeMatch(self, timestamp):
+		for child in self.ids.gameSrollView.children:
+			child.disabled = False
+
+
+		# for child in self.ids.highlightsSrollView.children:
+		self.ids.highlightsSrollView.clear_widgets()
+
+		match = self.dataCollector.getMatchByTimestamp(timestamp)
+		if match == None: return
+
+		self.ids.matchesInfoScreen.timestamp = timestamp
+		self.ids.matchesInfoScreen.score = match.score
+		self.ids.matchesInfoScreen.duration = match.duration
+		self.ids.matchesInfoScreen.shotOnGoals = match.shotOnGoals
+		self.ids.matchesInfoScreen.puckControl = match.puckControl
+		self.ids.matchesInfoScreen.accuracy = match.accuracy
+		self.ids.matchesInfoScreen.topSpeed = [match.humanTopSpeed[1], match.aiTopSpeed[1]]
+
+		# Goal highlights
+		prevScore = [0,0]
+		for gameTime in match.goals:	
+			# Insert highlight at the right place
+			diff = [x - y for x, y in zip(match.goals[gameTime], prevScore)]
+			goalFrom = diff.index(max(diff))
+			prevScore = match.goals[gameTime]
+
+			index = 0
+			for child in self.ids.highlightsSrollView.children:				
+				if gameTime < child.gameTime:
+					index += 1
+
+			hr = HighlightRecord()
+			hr.gameTime = gameTime
+			hr.uuid = str(match.clips[gameTime])
+			hr.text = "                          {1:2} -{0:2}          at {2:02.0f}:{3:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
+			hr.iconSource = "icons/human_goal.png" if goalFrom == 0 else "icons/robot_goal.png"
+			hr.iconXSize = 2.5
+			self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		# Top speed ai highlight
+		gameTime = match.aiTopSpeed[0]
+		index = 0
+		for child in self.ids.highlightsSrollView.children:				
+			if gameTime < child.gameTime:
+				index += 1
+
+		hr = HighlightRecord()
+		hr.gameTime = gameTime
+		hr.uuid = str(match.clips[gameTime])
+		hr.text = "                         {:.1f} m/s     at {:02.0f}:{:02.0f}".format(match.aiTopSpeed[1]/1000, gameTime//60, gameTime%60)
+		hr.iconSource = "icons/robot_speed.png"
+		hr.iconXSize = 2.5
+		self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		# Top speed human highlight
+		gameTime = match.humanTopSpeed[0]
+		index = 0
+		for child in self.ids.highlightsSrollView.children:				
+			if gameTime < child.gameTime:
+				index += 1
+
+		hr = HighlightRecord()
+		hr.gameTime = gameTime
+		hr.uuid = str(match.clips[gameTime])
+		hr.text = "                         {:.1f} m/s     at {:02.0f}:{:02.0f}".format(match.humanTopSpeed[1]/1000, gameTime//60, gameTime%60)
+		hr.iconSource = "icons/human_speed.png"
+		hr.iconXSize = 2.5
+		self.ids.highlightsSrollView.add_widget(hr, index=index)
+
+		self.ids.clipViewer.clear_widgets()		
+		im = Image(source="icons/no-video.png")
+		im.color = (0, 0, 0, .6)
+		self.ids.clipViewer.add_widget(im)
+
+	def changeHighlight(self, id):
+		for child in self.ids.highlightsSrollView.children:
+			child.disabled = False
+
+		self.ids.clipViewer.clear_widgets()		
+		im = ClipViewer(source=self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
+		im.uuid = str(id)
+		im.anim_delay = self.ids.matchesInfoScreen.clipFramerate
+		self.ids.clipViewer.add_widget(im)
+
+		# im.source(self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
+		# self.ids.matchesInfoScreen.timestamp = timestamp
+		# print(self.ids.matchesInfoScreen.timestamp)
 
  #----------------------------- Values updation -----------------------------
 	def updateValues(self, *args):
@@ -465,174 +589,6 @@ class RootWidget(BoxLayout):
 		self.settings.camera["colorToDetect"][1] = round((int(self.settings.camera["upperLimits"][1]) + int(self.settings.camera["lowerLimits"][1]))/2)
 		self.settings.camera["colorToDetect"][2] = round((int(self.settings.camera["upperLimits"][2]) + int(self.settings.camera["lowerLimits"][2]))/2)
 	
- #----------------------------- Info screen management ----------------------------- 
-	def updateInfoScreen(self, *args):
-
-		if self.dataCollector.newData:
-			self.dataCollector.newData = False			
-			for game in self.dataCollector.loadedGames:
-				gameTimestamp = game.datetime.timestamp()
-				# Check if record is alredy in list
-				exist = False
-				index = 0
-				for child in self.ids.gameSrollView.children:
-					if child.timestamp == gameTimestamp:
-						exist = True	
-						break					
-					elif gameTimestamp > child.timestamp:
-						index += 1
-				if exist: continue
-
-				gr = GameRecord()
-				gr.timestamp = gameTimestamp
-				winner = "HUMAN" if game.score[0] > game.score[1] else "AI" if game.score[0] < game.score[1] else "TIE"
-				gr.text= "{} - {}".format(winner, game.datetime.strftime('%d.%m.%Y  %H:%M'))
-
-				self.ids.gameSrollView.add_widget(gr, index=index)
-		
-		if not self.dataCollector.saving and not self.dataCollector.loading and self.ids.matchesInfoScreen.timestamp == 0:
-			if len(self.dataCollector.loadedGames) > 0:
-				self.changeMatch((self.dataCollector.getNewestMatch().datetime.timestamp()))
-
-	def changeMatch(self, timestamp):
-		for child in self.ids.gameSrollView.children:
-			child.disabled = False
-
-
-		# for child in self.ids.highlightsSrollView.children:
-		self.ids.highlightsSrollView.clear_widgets()
-
-		match = self.dataCollector.getMatchByTimestamp(timestamp)
-		if match == None: return
-
-		self.ids.matchesInfoScreen.timestamp = timestamp
-		self.ids.matchesInfoScreen.score = match.score
-		self.ids.matchesInfoScreen.duration = match.duration
-		self.ids.matchesInfoScreen.shotOnGoals = match.shotOnGoals
-		self.ids.matchesInfoScreen.puckControl = match.puckControl
-		self.ids.matchesInfoScreen.accuracy = match.accuracy
-		self.ids.matchesInfoScreen.topSpeed = [match.humanTopSpeed[1], match.aiTopSpeed[1]]
-
-		# Goal highlights
-		for gameTime in match.goals:	
-			# Insert highlight at the right place
-			index = 0
-			for child in self.ids.highlightsSrollView.children:				
-				if gameTime < child.gameTime:
-					index += 1
-
-			hr = HighlightRecord()
-			hr.gameTime = gameTime
-			hr.uuid = str(match.clips[gameTime])
-			hr.text = "Goal ({:}-{:}) at {:02.0f}:{:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
-			self.ids.highlightsSrollView.add_widget(hr, index=index)
-
-		# Top speed ai highlight
-		gameTime = match.aiTopSpeed[0]
-		index = 0
-		for child in self.ids.highlightsSrollView.children:				
-			if gameTime < child.gameTime:
-				index += 1
-
-		hr = HighlightRecord()
-		hr.gameTime = gameTime
-		hr.uuid = str(match.clips[gameTime])
-		hr.text = "TopSpeed - AI ({:.1f} m/s) at {:02.0f}:{:02.0f}".format(match.aiTopSpeed[1]/1000, gameTime//60, gameTime%60)
-		self.ids.highlightsSrollView.add_widget(hr, index=index)
-
-		# Top speed human highlight
-		gameTime = match.humanTopSpeed[0]
-		index = 0
-		for child in self.ids.highlightsSrollView.children:				
-			if gameTime < child.gameTime:
-				index += 1
-
-		hr = HighlightRecord()
-		hr.gameTime = gameTime
-		hr.uuid = str(match.clips[gameTime])
-		hr.text = "TopSpeed - HUMAN ({:.1f} m/s) at {:02.0f}:{:02.0f}".format(match.humanTopSpeed[1]/1000, gameTime//60, gameTime%60)
-
-		self.ids.highlightsSrollView.add_widget(hr, index=index)
-
-		self.ids.clipViewer.clear_widgets()		
-		im = Image(source="icons/no-video.png")
-		im.color = (0, 0, 0, .6)
-		self.ids.clipViewer.add_widget(im)
-
-	def changeHighlight(self, id):
-		for child in self.ids.highlightsSrollView.children:
-			child.disabled = False
-
-		self.ids.clipViewer.clear_widgets()		
-		im = ClipViewer(source=self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
-		im.uuid = str(id)
-		im.anim_delay = self.ids.matchesInfoScreen.clipFramerate
-		self.ids.clipViewer.add_widget(im)
-
-		# im.source(self.dataCollector.recordsPath + 'clips/' + str(id) + '.zip')
-		# self.ids.matchesInfoScreen.timestamp = timestamp
-		# print(self.ids.matchesInfoScreen.timestamp)
- 
-
- #----------------------------- Camera screen management -----------------------------
-	def updateCameraScreen(self, *args):
-		# Update settings screen
-		if self.ids.settingsScreenManager.current == "cameraSettingsScreen":
-			image = self.ids.maskSettingsStream
-			texture = self.imageToTexture(self.camera.filteredMask, "luminance")
-			if texture is not None:
-				self.cameraConnected = True
-				image.texture = texture
-			else:
-				self.cameraConnected = False
-				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
-
-			image = self.ids.frameSettingsStream
-			texture = self.imageToTexture(self.camera.frame, "bgr")
-			if texture is not None:
-				image.texture = texture
-			else:
-				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
-			
-		# Update camera screen
-		def cv2kivy(point):
-			return (image.x + point[0]/self.cameraResolution[0] * image.width, image.y + point[1]/self.cameraResolution[1] * image.height)
-			
-		# Update camera frame and everything camera can see in cameraScreen
-		image = self.ids.cameraStream
-
-		if self.ids.screenManager.current == "cameraScreen":
-			if image.showing == "Frame":
-				frame = self.camera.frame
-				frameFormat = "bgr"
-			elif image.showing == "Mask":
-				frame = self.camera.mask
-				frameFormat = "luminance"
-			elif image.showing == "Filtered mask":
-				frame = self.camera.filteredMask
-				frameFormat = "luminance"
-
-			texture = self.imageToTexture(frame, frameFormat)
-			if texture is not None:
-				image.texture = texture				
-				kivyField = [cv2kivy((point[0] * self.settings.camera["resolution"][0], point[1] * self.settings.camera["resolution"][1])) for point in self.settings.camera["fieldCorners"].tolist()]	
-				# print(kivyField)			
-				image.fieldCorners = [item for sublist in kivyField for item in sublist]
-				image.puckPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.camera.unitFilteredPuckPosition)))
-				image.desiredPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.game.getDesiredPosition())))
-				image.strikerPos = cv2kivy(self.camera._toTuple(self.camera._unitsToPixels(self.serial.vectors[0])))
-			
-			else:
-				image = Image(size=(192, 320), source="icons/no-video.png", allow_stretch = False)
-
-	def imageToTexture(self, frame, frameFormat="bgr"):
-		# Convert numpy array frame to kivy texture
-		texture = None
-		if frame is not None:
-			texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt=frameFormat)
-			texture.blit_buffer(frame.flatten(), colorfmt=frameFormat, bufferfmt='ubyte')
-		return texture	
-	
  #----------------------------- Communication with arduino -----------------------------
 	def updateArduino(self, *args):
 	 #----------------------------- Read -----------------------------
@@ -687,6 +643,61 @@ class RootWidget(BoxLayout):
 		self.ledsOn = value
 		self.ids.ledsToggle.state = "down" if value else "normal"
  
+ #----------------------------- Notifications & info -----------------------------
+	def openPopup(self, title = "Title", text = "Content", buttonText = "Dismiss", buttonAction = lambda x: print("nothing"), autoDismiss = True):
+		# print(text)
+		infoPopup = CustomPopup()
+		infoPopup.title = title
+		infoPopup.text = text
+		infoPopup.buttonText = buttonText
+		infoPopup.auto_dismiss = autoDismiss
+		infoPopup.onPress = buttonAction
+
+		infoPopup.separator_color = self.colorTheme
+		infoPopup.open()
+	
+	def openImage(self, path):
+		popup = ImagePopup(path)
+		popup.open()
+
+	def openWinnerPopup(self, text = "Content"):
+		winnerPopup = WinnerPopup()
+		winnerPopup.text = text
+		winnerPopup.open()
+
+	def showStatus(self, text, time=1):
+		if self.statusScheduler is not None:
+			Clock.unschedule(self.statusScheduler)
+		self.showingStatus = True
+		self.currentStatusText = text
+		self.statusScheduler = Clock.schedule_once(self.resetStatus, time)
+
+	def setStatus(self, text):
+		self.state = text
+		if not self.showingStatus:			
+			self.currentStatusText = self.state
+
+	def resetStatus(self, *args):
+		self.showingStatus = False
+		self.currentStatusText = self.state
+	
+	def updateStatus(self, *args):
+		# Update everything in status bar		
+		self.setStatus("Idle")
+		if self.dataCollector.loading: self.setStatus("Loading saved clips and game stats...")
+		if self.dataCollector.saving: self.setStatus("Saving game clips and stats...")
+		if not self.homed: self.setStatus("Homing required!")
+		if self.homing: self.setStatus("Homing...")
+		if not self.game.stopped: self.setStatus("Game running...")
+		if self.game.paused: self.setStatus("Game paused")
+		if not self.game.stopped and self.game.waitForPuck: self.setStatus("Waiting for puck...")
+		if self.ids.cameraStream.calibratingField: self.setStatus("Calibrating field...")
+		if not self.camera.analyzingStopped: self.setStatus("Analyzing most dominant color...")
+		if not self.camera.lockingAwbStopped: self.setStatus("Adjusting white balance...")
+
+		self.dateString = datetime.now().strftime('%d.%m.%Y')
+		self.timeString = datetime.now().strftime('%H:%M:%S')
+ 
  #----------------------------- Game management -----------------------------
 	def getScore(self):
 		score = self.game.score.copy()
@@ -731,8 +742,6 @@ class RootWidget(BoxLayout):
 		Animation.cancel_all(widget, parameter)
 		anim = eval("Animation("+parameter+"=value, duration=duration, t='"+transition+"')")
 		anim.start(widget)
-
-	
  
  #----------------------------- Debug -----------------------------
 	def testMotors(self):

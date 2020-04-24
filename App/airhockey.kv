@@ -662,17 +662,19 @@
 												InfoTuple:
 													title: "Status"
 													value: root.motorStatus
-											InfoTuple:
+											CommHistory:
 												# size_hint_x: 1.35
 												title: "Last Write"
 												value: root.writingLine
+												on_release: app.root.openHistory("Write history", root.serial.writeHistory)
 												# InfoTuple:
 												# 	title: "Cmd"
 												# 	value: "Home"
-											InfoTuple:
+											CommHistory:
 												# size_hint_x: 1.35
 												title: "Last Read"
 												value: root.readingLine
+												on_release: app.root.openHistory("Read history", root.serial.readHistory)
 												
 											# BoxLayout:
 											# 	# size_hint_y: 1.1
@@ -1537,6 +1539,7 @@
 		valign: "center"
 		text: root.value
 
+<CommHistory@ButtonBehavior+InfoTuple>
 # Drop down -------------------------------------------------------------
 <MySpinnerOption@SpinnerOption>:
     background_color: [0, 0, 0, 0]
@@ -1691,6 +1694,26 @@
 	# 	pos: root.pos
 	# 	size: root.size
 
+<HistoryPopup>:
+	size_hint: .4, .9
+	auto_dismiss: True
+	background: "white.png"
+	title_color: 0, 0, 0, 1
+	separator_height: 1
+	title_align: "center"
+	text: ""
+	historyText: ""
+
+	ScrollView:
+		do_scroll_x: False
+		do_scroll_y: True
+
+		Label:
+			size_hint_y: None
+			height: self.texture_size[1]
+			# text_size: self.width
+			padding: 10, 10
+			text: root.historyText
 
 <CustomPopup>: # Custom popup
     auto_dismiss: True
@@ -1734,6 +1757,7 @@
 					root.dismiss()
 
    
+
 
 # Editors ---------------------------------------------------------------
 <ArrowEditor@BoxLayout>:
@@ -1910,7 +1934,7 @@
 	height: 40
 	text: "Recorded game"
 	textMagnitude: .35
-	iconXOff: -80
+	iconXOff: -85
 	iconSize: .5
 	on_release:
 		app.root.changeMatch(self.timestamp)

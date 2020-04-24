@@ -2,6 +2,7 @@ import serial
 import time
 from HelperClasses import FPSCounter
 from threading import Thread
+from datetime import datetime
 
 class Serial():
 	def __init__(self, settings):
@@ -11,11 +12,15 @@ class Serial():
 		self.homed = False
 		self.goal = None
 		self.status = None
+		self.readHistory = []
+		self.writeHistory = []
 
 		self._readingLine = ""
 		self._writingLine = ""
 		self._writingQueue = []
 
+
+		self._prevRead = ""
 		self._prevWrite = ""
 
 		self._baudRate = 115200
@@ -50,8 +55,11 @@ class Serial():
 			try:
 				self._readingLine = self._ser.readline().decode('utf-8').rstrip()
 				#print(self._readingLine)
-				self._parseReading(self._readingLine)
-				_num += 1
+				if not self._readingLine == self._prevRead and not self._readingLine == "":
+					self._prevRead = self._readingLine
+					self.readHistory.append("{}  <-  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], self._readingLine))
+					self._parseReading(self._readingLine)
+					_num += 1
 				if time.time() - _prevTime > 1:
 					_prevTime = time.time()
 					# print(_num)python
@@ -61,6 +69,9 @@ class Serial():
 			except:
 				print("Error while decoding")
 				
+			while len(self.readHistory) > 200:
+				self.readHistory.pop(0)
+
 			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastRead)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
@@ -72,16 +83,20 @@ class Serial():
 		while True:
 			self._lastWriteAt = time.time()
 			#print(time.time())
-			textToWrite = self._writingLine
 			if len(self._writingQueue) > 0:
-				textToWrite = self._writingQueue[0]
+				self._writingLine = self._writingQueue[0]
 				self._writingQueue.pop(0)	
 							
-			if not textToWrite == self._prevWrite and not textToWrite == "":
+			if not self._writingLine == self._prevWrite and not self._writingLine == "":
 				self._writingCounter.tick()
-				self._prevWrite = textToWrite			
-				self._ser.write((str(textToWrite) + '\n').encode('ascii'))
+				self._prevWrite = self._writingLine			
+				self._ser.write((str(self._writingLine) + '\n').encode('ascii'))
+				self.writeHistory.append("{}  ->  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], self._writingLine))
 				#print((str(self._writingLine) + '\n'))
+
+			while len(self.writeHistory) > 200:
+				self.writeHistory.pop(0)
+
 			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWriteAt)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
@@ -120,8 +135,10 @@ class Serial():
 
 	def start(self):
 		if self._stopped:
-			self._ser = serial.Serial('/dev/ttyACM0', self._baudRate, )	
-			#self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
+			try:
+				self._ser = serial.Serial('/dev/ttyACM0', self._baudRate)	
+			except: 
+				self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
 			self._ser.flush()
 			self._readingCounter.start()
 			self._writingCounter.start()

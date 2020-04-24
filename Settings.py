@@ -68,3 +68,10 @@ class Settings():
 			# print(self.camera["fieldCorners"])
 		except:
 			self.saveSettings()
+
+	def copy(self):
+		newInstance = Settings(self.path)
+		newInstance.camera = self.camera.copy()
+		newInstance.motors = self.motors.copy()
+		newInstance.game = self.game.copy()
+		return newInstance

@@ -159,6 +159,13 @@ class ImagePopup(Popup):
 		# im.color=(0,0,0,.6)
 		self.add_widget(im)
 
+class HistoryPopup(Popup):
+	def __init__(self, title, history, **kwargs):
+		super(HistoryPopup, self).__init__(**kwargs)
+
+		self.title = title
+		self.historyText = "\n".join(history)
+
 class GameRecord(RoundedButton):
 	pass
 
@@ -188,8 +195,8 @@ class RootWidget(BoxLayout):
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
-		self.changeScreen("infoScreen") # Initial screen
-		self.changeSettingsScreen("controlSettingsScreen")
+		self.changeScreen("settingsScreen") # Initial screen
+		self.changeSettingsScreen("motorsSettingsScreen")
 		self.changeInfoScreen("matchesInfoScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
 
@@ -337,9 +344,9 @@ class RootWidget(BoxLayout):
 	def changeSpeed(self, index):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
-			self.settings.motors["velocity"] = (14000/3) * index
-			self.settings.motors["acceleration"] = (18000/3) * index
-			self.settings.motors["pGain"] = 180			
+			self.settings.motors["velocity"] = (3000/3) * index
+			self.settings.motors["acceleration"] = (30000/3) * index
+			self.settings.motors["pGain"] = 21			
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
  #----------------------------- Camera screen management -----------------------------
@@ -423,7 +430,7 @@ class RootWidget(BoxLayout):
 				gr.timestamp = gameTimestamp
 				winnerIcon = "icons/monitor.png" if game.score[0] > game.score[1] else "icons/human.png" if game.score[0] < game.score[1] else "icons/tie2.png"
 				gr.iconSource = winnerIcon
-				gr.text= "     {1:2} -{0:2}      {2:}".format(*game.score, game.datetime.strftime('%d.%m.%y %H:%M'))
+				gr.text= "       ({3:})  {1:2} -{0:2}    {2:}".format(*game.score, game.datetime.strftime('%d.%m.%y %H:%M'), game.difficulty)
 
 				self.ids.gameSrollView.add_widget(gr, index=index)
 		
@@ -466,7 +473,7 @@ class RootWidget(BoxLayout):
 			hr = HighlightRecord()
 			hr.gameTime = gameTime
 			hr.uuid = str(match.clips[gameTime])
-			hr.text = "                          {1:2} -{0:2}          at {2:02.0f}:{3:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
+			hr.text = "                          {1:2} -{0:2}             at {2:02.0f}:{3:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
 			hr.iconSource = "icons/human_goal.png" if goalFrom == 0 else "icons/robot_goal.png"
 			hr.iconXSize = 2.5
 			self.ids.highlightsSrollView.add_widget(hr, index=index)
@@ -481,7 +488,7 @@ class RootWidget(BoxLayout):
 		hr = HighlightRecord()
 		hr.gameTime = gameTime
 		hr.uuid = str(match.clips[gameTime])
-		hr.text = "                         {:.1f} m/s     at {:02.0f}:{:02.0f}".format(match.aiTopSpeed[1]/1000, gameTime//60, gameTime%60)
+		hr.text = "                         {:.1f} m/s        at {:02.0f}:{:02.0f}".format(match.aiTopSpeed[1]/1000, gameTime//60, gameTime%60)
 		hr.iconSource = "icons/robot_speed.png"
 		hr.iconXSize = 2.5
 		self.ids.highlightsSrollView.add_widget(hr, index=index)
@@ -496,7 +503,7 @@ class RootWidget(BoxLayout):
 		hr = HighlightRecord()
 		hr.gameTime = gameTime
 		hr.uuid = str(match.clips[gameTime])
-		hr.text = "                         {:.1f} m/s     at {:02.0f}:{:02.0f}".format(match.humanTopSpeed[1]/1000, gameTime//60, gameTime%60)
+		hr.text = "                         {:.1f} m/s        at {:02.0f}:{:02.0f}".format(match.humanTopSpeed[1]/1000, gameTime//60, gameTime%60)
 		hr.iconSource = "icons/human_speed.png"
 		hr.iconXSize = 2.5
 		self.ids.highlightsSrollView.add_widget(hr, index=index)
@@ -658,6 +665,10 @@ class RootWidget(BoxLayout):
 	
 	def openImage(self, path):
 		popup = ImagePopup(path)
+		popup.open()
+	
+	def openHistory(self, title = "Title", history = ["log1", "log2", "log3"]):
+		popup = HistoryPopup(title, history)
 		popup.open()
 
 	def openWinnerPopup(self, text = "Content"):

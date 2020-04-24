@@ -20,7 +20,7 @@ except ModuleNotFoundError:
     import pickle
 
 class DataCollector():
-	def __init__(self, game, camera, settings, pathToRecords="GameRecordings/"):
+	def __init__(self, game, camera, settings, pathToRecords="GameRecordings/", pathToStats="AirHockey_statistics.obj"):
 		self.game = game
 		self.camera = camera
 		self.settings = settings
@@ -32,6 +32,10 @@ class DataCollector():
 		self.saving = False
 		self.loading = False
 		self.newData = False
+
+		self.pathToStats = pathToStats
+		self.stats = Statistics()
+		self.loadStats()
 		
 
 		self.reset()
@@ -55,8 +59,11 @@ class DataCollector():
 
 	def stop(self):
 		self._stopped = True
-		self.gameData.score = self.game.score.copy()
+		self.gameData.winner = -1 if self.game.score[0] == self.game.score[1] else self.game.score.index(max(self.game.score))
+		self.gameData.score = self.game.score.copy()		
+		self.gameData.difficulty = self.settings.game["difficulty"]
 		self._collectData()
+		self.stats.games[datetime.now().strftime('%y-%m-%d_%H-%M-%S')] = self.gameData.copy()
 		# self.gameData.duration = self.game.gameTime
 		Thread(target=self._saveRecord, args=(self.gameData.copy(), self.videoFrames.copy())).start()
 		print("Collecting data stopped.")
@@ -79,6 +86,19 @@ class DataCollector():
 			return self.loadedGames[newestIndex]
 		return None
 	
+	def saveStats(self):
+		with open(self.pathToStats, 'wb') as statsFile:
+			pickle.dump(self.stats, statsFile)	
+
+	def loadStats(self):
+		try:
+			with open(self.pathToStats, 'rb') as statsFile:
+				self.stats = pickle.load(statsFile)				
+			print("Stats loaded")
+		except:
+			print("Error while loading stats... New stats created.")
+			self.saveStats()
+
 	def _collectingData(self):
 		while True:
 			
@@ -132,7 +152,6 @@ class DataCollector():
 		self.saving = False
 		self.loadRecords()
 			
-
 	def _storeClips(self, gameData, videoFrames):
 		for key in gameData.goals:
 			while not self.game.stopped:
@@ -183,7 +202,6 @@ class DataCollector():
 		
 		return id
 		
-
 	def _loadRecords(self):
 		while self.loading or self.saving:
 			time.sleep(.2)
@@ -211,11 +229,10 @@ class DataCollector():
 
 
 
-
-
 class GameData():
 	def __init__(self):
 		self.datetime = datetime.now()
+		self.winner = -1
 		self.score = [0,0]
 		self.puckControl = [0,0]
 		self.shotOnGoals = [0,0]
@@ -225,10 +242,10 @@ class GameData():
 		self.goals = {}
 		self.aiTopSpeed = [0,0]
 		self.humanTopSpeed = [0,0]
+		self.difficulty = 0
 
 	def getClipId(self, gametime):
 		return self.clips[gametime]
-
 	
 	def copy(self):
 		newInstance = GameData()
@@ -241,8 +258,13 @@ class GameData():
 		newInstance.duration = self.duration
 		newInstance.aiTopSpeed = self.aiTopSpeed.copy()
 		newInstance.humanTopSpeed = self.humanTopSpeed.copy()
+		newInstance.difficulty = self.difficulty
 		return newInstance
 
 
 
-		
+class Statistics():
+	def __init__(self):
+		self.games = OrderedDict()
+
+

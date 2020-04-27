@@ -63,7 +63,8 @@ class DataCollector():
 		self.gameData.score = self.game.score.copy()		
 		self.gameData.difficulty = self.settings.game["difficulty"]
 		self._collectData()
-		self.stats.games[datetime.now().strftime('%y-%m-%d_%H-%M-%S')] = self.gameData.copy()
+		self.stats.games.append(self.gameData.copy())
+		self.saveStats()
 		# self.gameData.duration = self.game.gameTime
 		Thread(target=self._saveRecord, args=(self.gameData.copy(), self.videoFrames.copy())).start()
 		print("Collecting data stopped.")
@@ -85,6 +86,7 @@ class DataCollector():
 		if len(self.loadedGames) > 0:
 			return self.loadedGames[newestIndex]
 		return None
+	
 	
 	def saveStats(self):
 		with open(self.pathToStats, 'wb') as statsFile:
@@ -265,6 +267,6 @@ class GameData():
 
 class Statistics():
 	def __init__(self):
-		self.games = OrderedDict()
+		self.games = []
 
 

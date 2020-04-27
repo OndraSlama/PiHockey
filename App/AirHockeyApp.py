@@ -474,7 +474,7 @@ class RootWidget(BoxLayout):
 			hr.gameTime = gameTime
 			hr.uuid = str(match.clips[gameTime])
 			hr.text = "                          {1:2} -{0:2}             at {2:02.0f}:{3:02.0f}".format(*match.goals[gameTime], gameTime//60, gameTime%60)
-			hr.iconSource = "icons/human_goal.png" if goalFrom == 0 else "icons/robot_goal.png"
+			hr.iconSource = "icons/human_goal.png" if goalFrom == 1 else "icons/robot_goal.png"
 			hr.iconXSize = 2.5
 			self.ids.highlightsSrollView.add_widget(hr, index=index)
 
@@ -712,8 +712,8 @@ class RootWidget(BoxLayout):
  #----------------------------- Game management -----------------------------
 	def getScore(self):
 		score = self.game.score.copy()
-		if not self.score[0] == score[0]: self.addScore(self.ids.human, self.ids.ai, [score[0], score[1]])
-		if not self.score[1] == score[1]: self.addScore(self.ids.ai, self.ids.human, [score[1], score[0]])
+		if not self.score[1] == score[1]: self.addScore(self.ids.human, self.ids.ai, [score[1], score[0]])
+		if not self.score[0] == score[0]: self.addScore(self.ids.ai, self.ids.human, [score[0], score[1]])
 		self.checkGameEnd()
 		return score
 

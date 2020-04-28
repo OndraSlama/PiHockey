@@ -31,9 +31,12 @@ from Functions import getValueInXYdir
 
 import numpy as np
 import cv2
+import os
 from datetime import datetime
 from random import randint
 from functools import partial
+from pygame.math import Vector2
+import json
 
 import os
 os.environ['KIVY_GL_BACKEND'] = 'gl'
@@ -52,7 +55,21 @@ class RoundedButtonLook(Widget):
 	pass
 
 class RoundedButton(Button,RoundedButtonLook):
-	pass
+	__events__ = ('on_long_press', )
+	long_press_time = NumericProperty(1)
+    
+	def on_state(self, instance, value):
+		if value == 'down':
+			lpt = self.long_press_time
+			self._clockev = Clock.schedule_once(self._do_long_press, lpt)
+		else:
+			self._clockev.cancel()
+
+	def _do_long_press(self, dt):
+		self.dispatch('on_long_press')
+		
+	def on_long_press(self, *largs):
+		pass
 
 class RoundedLabel(Label,RoundedLook):
 	pass
@@ -115,8 +132,6 @@ class ControlField(Image):
 		app.root.controlMode = 4
 		app.root.desiredVel = getValueInXYdir(dir[0], dir[1], magnitude * app.root.settings.motors["velocity"])
 		
-
-
 class ImageViewer(Image):
 	def on_touch_down(self, touch):
 		# Find closest corner
@@ -143,6 +158,7 @@ class ImageViewer(Image):
 			setCorners[i] = [self.absoluteReferencePoint[0] + distVector[0]*self.calibratingGain/app.root.settings.camera["resolution"][0], self.absoluteReferencePoint[1] + distVector[1]*self.calibratingGain/app.root.settings.camera["resolution"][1]]
 			# print(self.absoluteReferencePoint)
 
+#----------------------------- Popups -----------------------------
 class CustomPopup(Popup):
 	pass
 
@@ -166,6 +182,7 @@ class HistoryPopup(Popup):
 		self.title = title
 		self.historyText = "\n".join(history)
 
+
 class GameRecord(RoundedButton):
 	pass
 
@@ -184,9 +201,10 @@ class EnlargedViewer(ButtonBehavior, AsyncImage):
 
 #----------------------------- Root Widget -----------------------------
 class RootWidget(BoxLayout):
-	settings = Settings('AirHockey_settings.obj')
+	settings = Settings('ah_settings.obj')
 	camera = Camera(settings.camera)
 	game = Game(camera, settings.game)
+	records = []
 	dataCollector = DataCollector(game, camera, settings, "GameRecordings/")
 	serial = Serial(settings.motors)
 	
@@ -204,6 +222,7 @@ class RootWidget(BoxLayout):
 		Clock.schedule_interval(self.updateCameraScreen, 1/30)
 		Clock.schedule_interval(self.updateArduino, 1/200)
 		Clock.schedule_interval(self.updateInfoScreen, 1/5)
+		Clock.schedule_interval(self.updateRecording, 1/100)
 
 		self.settings.game["applyMaxTime"]  = True
 		Clock.schedule_once(self.initializeSerial, 1)
@@ -408,6 +427,30 @@ class RootWidget(BoxLayout):
 			texture.blit_buffer(frame.flatten(), colorfmt=frameFormat, bufferfmt='ubyte')
 		return texture	
  
+	def updateRecording(self, *args):
+		if self.recording:
+			self.records.append([
+				datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
+				round(self.game.gameTime),
+				[round(self.game.strategy.puck.position.x), round(self.game.strategy.puck.position.y)],
+				[round(self.game.strategy.puck.velocity.x), round(self.game.strategy.puck.velocity.y)],
+				self.game.strategy.puck.trajectory.copy(),
+				[round(self.game.strategy.striker.position.x), round(self.game.strategy.striker.position.y)],
+				[round(self.game.strategy.striker.velocity.x), round(self.game.strategy.striker.velocity.y)]
+			])
+
+	def saveRecord(self):
+		datetimestr = datetime.now().strftime('Recording_%Y-%m-%d_%H-%M-%S')
+		try:
+			os.mkdir("CameraRecordings")
+		except: pass
+
+		with open("CameraRecordings/" + datetimestr + '.txt', 'w') as outfile:
+			json.dump(self.records, outfile)
+
+		print("recording saved")
+		self.records = []
+
  #----------------------------- Info screen management ----------------------------- 
 	def updateInfoScreen(self, *args):
 
@@ -528,6 +571,7 @@ class RootWidget(BoxLayout):
 		# print(self.ids.matchesInfoScreen.timestamp)
 
  #----------------------------- Values updation -----------------------------
+
 	def updateValues(self, *args):
 		# Debug
 		# print(self.serial._readingCounter.print())

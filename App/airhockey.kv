@@ -4,6 +4,7 @@
 #:import Animation kivy.animation.Animation
 #:import constants Constants
 #:import Joystick kivy.garden.joystick.Joystick
+#:import Window kivy.core.window.Window
 
 # Default values ---------------------
 
@@ -22,6 +23,8 @@
 <RootWidget>: # ROOT widget
 	id: rootWidget
 	orientation: 'vertical'
+	# Global
+	recording: False
 
 	# Game
 	gameFrequency: 0
@@ -245,6 +248,7 @@
 							iconXOff: -55
 							text: "    Game"
 							on_release: root.changeSettingsScreen("gameSettingsScreen")
+							on_long_press: root.openPopup("Reset game settings", "Are you sure you want to reset game settings?", "Reset", lambda x: root.settings.resetGameSettings())
 
 						RoundedButton:
 							posHint: 0
@@ -256,6 +260,8 @@
 							iconXOff: -55
 							text: "      Camera"
 							on_release: root.changeSettingsScreen("cameraSettingsScreen")
+							on_long_press: root.openPopup("Reset camera settings", "Are you sure you want to reset camera settings?", "Reset", lambda x: root.settings.resetCameraSettings())
+
 
 						RoundedButton:
 							posHint: 0
@@ -267,6 +273,7 @@
 							iconXOff: -55
 							text: "     Table"
 							on_release: root.changeSettingsScreen("motorsSettingsScreen")
+							on_long_press: root.openPopup("Reset table settings", "Are you sure you want to reset table settings?", "Reset", lambda x: root.settings.resetMotorsSettings())
 
 						RoundedButton:
 							posHint: 0
@@ -662,7 +669,7 @@
 												InfoTuple:
 													title: "Status"
 													value: root.motorStatus
-											CommHistory:
+											InfoTuple:
 												# size_hint_x: 1.35
 												title: "Last Write"
 												value: root.writingLine
@@ -670,7 +677,7 @@
 												# InfoTuple:
 												# 	title: "Cmd"
 												# 	value: "Home"
-											CommHistory:
+											InfoTuple:
 												# size_hint_x: 1.35
 												title: "Last Read"
 												value: root.readingLine
@@ -1132,16 +1139,21 @@
 							spacing: 10
 							# size_hint: 1, None
 							# height: 70
-							RoundedButton: 
-								text: "Start Cam"
-								disabled: not root.state == "Idle" and not root.state == "Homing required!"
-								on_release: root.initializeCamera()
-							RoundedButton: 
-								text: "Stop Cam"
-								disabled: not root.state == "Idle" and not root.state == "Homing required!"
-								on_release: root.camera.stopCamera()
+							# RoundedButton: 
+							# 	text: "Start Cam"
+							# 	disabled: not root.state == "Idle" and not root.state == "Homing required!"
+							# 	on_release: root.initializeCamera()
+							# RoundedButton: 
+							# 	text: "Stop Cam"
+							# 	disabled: not root.state == "Idle" and not root.state == "Homing required!"
+							# 	on_release: root.camera.stopCamera()
+							RoundedSwitchButton: 
+								text: "Record"
+								on_release: 
+									root.recording = self.isDown
+									if not self.isDown: root.saveRecord()
 							RoundedDropDown: 
-								size_hint_x: 2
+								size_hint_x: 1.5
 								values: "Frame", "Mask", "Filtered mask"
 								on_text: 
 									cameraStream.showing = self.text
@@ -1397,6 +1409,7 @@
 			InfoTuple:
 				title: root.dateString
 				value: root.timeString
+				on_release: Window.minimize()
 
 
 
@@ -1503,7 +1516,7 @@
 			pos: [root.center_x - (root.size[1] * root.iconSize) * root.sizeGain/2 + root.iconXOff,  root.center_y - (root.size[1] * root.iconSize) * root.sizeGain/2 + root.iconYOff]
 			source: root.iconSource
 # Info tuple ------------------------------------------------------------
-<InfoTuple@BoxLayout>:
+<InfoTuple@ButtonBehavior+BoxLayout>:
 	title: ""
 	value: ""
 	titleSize: self.height*.4
@@ -1538,8 +1551,6 @@
 		halign: "center"
 		valign: "center"
 		text: root.value
-
-<CommHistory@ButtonBehavior+InfoTuple>
 # Drop down -------------------------------------------------------------
 <MySpinnerOption@SpinnerOption>:
     background_color: [0, 0, 0, 0]

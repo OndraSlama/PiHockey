@@ -34,19 +34,19 @@ class Settings():
 
 	def resetMotorsSettings(self):
 		self.motors["communicationFrequency"] = 500
-		self.motors["velocity"] = 1500
-		self.motors["acceleration"] = 20000
-		self.motors["pGain"] = 10		
+		self.motors["velocity"] = 3000
+		self.motors["acceleration"] = 30000
+		self.motors["pGain"] = 21		
 
 	def resetGameSettings(self):
 		self.game["maxTime"] = 180
 		self.game["maxScore"] = 5
 		self.game["applyMaxScore"] = True
 		self.game["applyMaxTime"] = False
-		self.game["difficulty"] = 0
+		self.game["difficulty"] = 3
 		self.game["strategy"] = 3
-		self.game["robotSpeed"] = 0
-		self.game["frequency"] = 200
+		self.game["robotSpeed"] = 3
+		self.game["frequency"] = 270
 
 	def saveSettings(self):
 		with open(self.path, 'wb') as settingsFile:

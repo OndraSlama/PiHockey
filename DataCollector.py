@@ -20,7 +20,7 @@ except ModuleNotFoundError:
     import pickle
 
 class DataCollector():
-	def __init__(self, game, camera, settings, pathToRecords="GameRecordings/", pathToStats="AirHockey_statistics.obj"):
+	def __init__(self, game, camera, settings, pathToRecords="GameRecordings/", pathToStats="ah_statistics.obj"):
 		self.game = game
 		self.camera = camera
 		self.settings = settings
@@ -148,7 +148,7 @@ class DataCollector():
 		self.saving = True
 
 		self._storeClips(gameData, videoFrames)
-		with open(self.recordsPath + "AHgame_{}_{}-{}.obj".format(gameData.datetime.strftime('%d-%m-%Y-%H-%M'), *gameData.score), 'wb') as gameRecord:
+		with open(self.recordsPath + "ah_game_{}_{}-{}.obj".format(gameData.datetime.strftime('%d-%m-%Y-%H-%M'), *gameData.score), 'wb') as gameRecord:
 			pickle.dump(gameData, gameRecord)	
 
 		self.saving = False

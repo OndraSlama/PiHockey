@@ -105,7 +105,7 @@ class Serial():
 				return
 
 	def _parseReading(self, txt):
-		if txt in ["e1", "e2"]:
+		if txt in ["e1", "e2", "restarted"]:
 			self.status = txt
 		elif txt == "gh" or txt == "gr":
 			self.goal = txt

@@ -227,6 +227,7 @@ class RootWidget(BoxLayout):
 		self.settings.game["applyMaxTime"]  = True
 		Clock.schedule_once(self.initializeSerial, 1)
 		Clock.schedule_once(self.initializeCamera, 1)
+		Clock.schedule_once(self.sendAllSettings, 10)
 
 		# Clock.schedule_once(self.debug3, 20)
 
@@ -653,6 +654,10 @@ class RootWidget(BoxLayout):
 			self.openPopup("Driver error", "Error occured in one of the motor drivers. Most likely due to missed steps. Try lowering motors movement parameters and restart drivers to contine", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
+		if self.serial.readStatus() == "restarted":
+			self.sendAllSettings()
+			self.homed = False
+
 		# if self..readStatus() == "homed":
 		# 	self.showStatus("Homing finished")
 		# 	self.homed = True
@@ -684,6 +689,12 @@ class RootWidget(BoxLayout):
 		
 		# print(self.desiredPos)
 	
+	def sendAllSettings(self, *args):
+		self.serial.queueLine("setmaxspeed,"+str(round(self.settings.motors['velocity'])))
+		self.serial.queueLine("setaccel,"+str(round(self.settings.motors['acceleration'])))
+		self.serial.queueLine("kpgain,"+str(round(self.settings.motors['pGain'])))
+		self.serial.queueLine("preventwallhit,"+"1" if self.ids.cautionMode.isDown else "0")
+
 	def setFans(self, value, *args):
 		self.serial.queueLine("fans,"+str(int(value)))
 		self.fansOn = value

@@ -763,6 +763,7 @@ class RootWidget(BoxLayout):
 
 	def checkGameEnd(self):
 		if self.game.gameDone:
+			self.dataCollector.stop()
 			self.stopGame()
 			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
 			self.openWinnerPopup(winner)
@@ -775,8 +776,7 @@ class RootWidget(BoxLayout):
 
 	def stopGame(self):
 		self.game.gameDone = False
-		self.game.stop()
-		self.dataCollector.stop()
+		self.game.stop()		
 		self.setFans(False)
 		self.setLeds(False)
  

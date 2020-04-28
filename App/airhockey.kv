@@ -218,6 +218,7 @@
 								iconSource: "icons/stop.png"
 								disabled: not root.playing and not root.paused
 								on_release: 
+									root.dataCollector.discard()
 									root.stopGame()
 									root.showStatus("Game stopped")
 
@@ -870,6 +871,9 @@
 								size_hint_x: None
 								width: self.height * (1296/800)
 								mode: 3
+								fieldWidthPxl: 1034/1296 * self.width
+								fieldHeightPxl: 621/800 * self.height
+								fieldXPxl: self.width * 131/1296
 								# center: self.parent.center
 								pos_hint: {"center_x": .5, "center_y": .5}
 
@@ -877,11 +881,12 @@
 
 								pusherX: root.strikerPos[0]
 								pusherY: root.strikerPos[1]
-								canvas.before:
+								canvas.after:
 									Color:
 										rgba: [0,1,0,1]
 									Line:
-										points: root.trajectory
+										points: [self.x + self.fieldXPxl + (root.trajectory[i]/1000) * self.fieldWidthPxl if i%2 == 0 else self.y + self.height/2 + (root.trajectory[i]/300) * self.fieldHeightPxl/2 for i in range(len(root.trajectory))]
+										# points: [root.trajectory[i] if i%2 == 0 else root.trajectory[i] for i in range(len(root.trajectory))]
 										width: 2
 
 							#----------------------------- Slider -----------------------------
@@ -889,7 +894,7 @@
 									id: controlSlider
 									height: controlField.height * 799/885
 									width: self.height * 232/2222
-									x: controlField.x + (controlField.width * 131/1296 - self.width*0.58) + (controlField.pusherX/1000) * 1034/1296 * controlField.width
+									x: controlField.x + (controlField.fieldXPxl - self.width*0.58) + (controlField.pusherX/1000) * controlField.fieldWidthPxl
 									y: controlField.y + (controlField.height - self.height)/2
 									source: "images/slider_landscape.png"	
 							#----------------------------- Striker -----------------------------
@@ -899,15 +904,15 @@
 									height: self.width
 
 									x: controlSlider.x + (controlSlider.width - self.width)*0.32
-									y: controlField.y +  controlField.height/2 - self.height/2 + (controlField.pusherY/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									y: controlField.y + controlField.height/2 - self.height/2 + (controlField.pusherY/300) * controlField.fieldHeightPxl/2#(controlSlider.width - self.width)/2
 									source: "images/pusher_landscape.png"
 							#----------------------------- Target -----------------------------
 								Image:
 									id: controlTarget
 									size: controlStriker.size
 
-									x: controlField.x + (controlField.width * 131/1296 - self.width/2) + (root.desiredPos[0]/1000) * 1034/1296 * controlField.width
-									y: controlField.y +  controlField.height/2 - self.height/2 + (root.desiredPos[1]/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									x: controlField.x + (controlField.fieldXPxl - self.width/2) + (root.desiredPos[0]/1000) * controlField.fieldWidthPxl
+									y: controlField.y +  controlField.height/2 - self.height/2 + (root.desiredPos[1]/300) * controlField.fieldHeightPxl/2#(controlSlider.width - self.width)/2
 									source: "icons/target.png"
 									color: root.colorTheme
 
@@ -927,8 +932,8 @@
 									width: controlStriker.width * 32/50
 									height: self.width
 
-									x: controlField.x + (controlField.width * 131/1296 - self.width/2) + (root.puckPos[0]/1000) * 1034/1296 * controlField.width
-									y: controlField.y +  controlField.height/2 - self.height/2 + (root.puckPos[1]/300) * 621/800 * controlField.height/2#(controlSlider.width - self.width)/2
+									x: controlField.x + (controlField.fieldXPxl - self.width/2) + (root.puckPos[0]/1000) * controlField.fieldWidthPxl
+									y: controlField.y +  controlField.height/2 - self.height/2 + (root.puckPos[1]/300) * controlField.fieldHeightPxl/2#(controlSlider.width - self.width)/2
 									source: "images/puck.png"
 									color: root.colorTheme
 							#----------------------------- Joystick -----------------------------
@@ -1138,15 +1143,7 @@
 							# padding: [0, 10]
 							spacing: 10
 							# size_hint: 1, None
-							# height: 70
-							# RoundedButton: 
-							# 	text: "Start Cam"
-							# 	disabled: not root.state == "Idle" and not root.state == "Homing required!"
-							# 	on_release: root.initializeCamera()
-							# RoundedButton: 
-							# 	text: "Stop Cam"
-							# 	disabled: not root.state == "Idle" and not root.state == "Homing required!"
-							# 	on_release: root.camera.stopCamera()
+							# height: 70							
 							RoundedSwitchButton: 
 								text: "Record"
 								on_release: 

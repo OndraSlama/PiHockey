@@ -1,5 +1,5 @@
 from Strategy.StrategyStructs import *
-from HelperClasses import Filter, Line
+from UniTools import Filter, Line
 from Constants import *
 from numpy import sign
 from pygame.math import Vector2

@@ -4,7 +4,7 @@ from threading import Thread
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from PiVideoStream import PiVideoStream
-from HelperClasses import Filter, FPSCounter, Repeater
+from UniTools import Filter, FPSCounter, Repeater
 from pygame.math import Vector2
 from Constants import *
 from Settings import Settings

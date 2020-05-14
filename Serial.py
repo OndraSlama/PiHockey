@@ -1,6 +1,6 @@
 import serial
 import time
-from HelperClasses import FPSCounter
+from UniTools import FPSCounter
 from threading import Thread
 from datetime import datetime
 

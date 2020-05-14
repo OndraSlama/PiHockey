@@ -12,7 +12,7 @@ GOAL_SPAN = 240
 
 # Limits
 YLIMIT = 230
-XLIMIT = 70
+XLIMIT = 65
 STRIKER_AREA_WIDTH = 450
 
 # Objects sizes in game units

@@ -140,4 +140,5 @@ cython_debug/
 
 # My stuff
 GameRecordings/
+CameraRecordings/
 .vscode

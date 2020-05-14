@@ -133,7 +133,8 @@ class DataCollector():
 
 
 		self._checkScore(gameTime)
-		self.videoFrames[gameTime] = self.camera.frame.copy()
+		if self.camera.frame is not None:
+			self.videoFrames[gameTime] = self.camera.frame.copy()
 		# print("Frame collected")
 
 	def _checkScore(self, gameTime):

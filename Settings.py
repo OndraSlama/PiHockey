@@ -33,10 +33,11 @@ class Settings():
 		self.camera["limitPuckRadius"] = 10
 
 	def resetMotorsSettings(self):
-		self.motors["communicationFrequency"] = 500
+		self.motors["communicationFrequency"] = 200
 		self.motors["velocity"] = 3000
 		self.motors["acceleration"] = 30000
-		self.motors["pGain"] = 21		
+		self.motors["deceleration"] = 100000
+		# self.motors["pGain"] = 21		
 
 	def resetGameSettings(self):
 		self.game["maxTime"] = 180

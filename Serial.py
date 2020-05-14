@@ -9,7 +9,7 @@ class Serial():
 		self.settings = settings
 		# Reading ----
 		self.vectors = [(0,0), (0,0)]
-		self.homed = False
+		self.homed = True
 		self.goal = None
 		self.status = None
 		self.readHistory = []
@@ -18,6 +18,8 @@ class Serial():
 		self._readingLine = ""
 		self._writingLine = ""
 		self._writingQueue = []
+
+		self.error = False
 
 
 		self._prevRead = ""
@@ -54,10 +56,15 @@ class Serial():
 			self._readingCounter.tick()
 			try:
 				self._readingLine = self._ser.readline().decode('utf-8').rstrip()
+			except:
+				self.stop()
+				self.error = True
+				print("Communication error")
+			try:
 				#print(self._readingLine)
-				if not self._readingLine == self._prevRead and not self._readingLine == "":
+				if not self._readingLine == "":
 					self._prevRead = self._readingLine
-					self.readHistory.append("{}  <-  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], self._readingLine))
+					self.readHistory.insert(0, "{}  <-  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], self._readingLine))
 					self._parseReading(self._readingLine)
 					_num += 1
 				if time.time() - _prevTime > 1:
@@ -65,14 +72,15 @@ class Serial():
 					# print(_num)python
 
 					_num = 0
-
 			except:
 				print("Error while decoding")
+
+			
 				
 			while len(self.readHistory) > 200:
-				self.readHistory.pop(0)
+				self.readHistory.pop()
 
-			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastRead)
+			sleepTime = 1/300 - (time.time() - self._lastRead)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -82,22 +90,28 @@ class Serial():
 	def _writing(self):
 		while True:
 			self._lastWriteAt = time.time()
+			queueLine = False
 			#print(time.time())
+			lineToWrite = self._writingLine
 			if len(self._writingQueue) > 0:
-				self._writingLine = self._writingQueue[0]
-				self._writingQueue.pop(0)	
+				lineToWrite = self._writingQueue[0]
+				self._writingQueue.pop(0)
+				queueLine = True
+			
 							
-			if not self._writingLine == self._prevWrite and not self._writingLine == "":
+			if not lineToWrite == self._prevWrite and not lineToWrite == "":
 				self._writingCounter.tick()
-				self._prevWrite = self._writingLine			
-				self._ser.write((str(self._writingLine) + '\n').encode('ascii'))
-				self.writeHistory.append("{}  ->  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], self._writingLine))
-				#print((str(self._writingLine) + '\n'))
+				self._ser.write((str(lineToWrite) + '\n').encode('ascii'))
+				self.writeHistory.insert(0, "{}  ->  {}".format(datetime.now().strftime('%H:%M:%S.%f')[:-2], lineToWrite))
+				if queueLine == False:
+					self._prevWrite = lineToWrite			
+#print((str(lineToWrite) + '\n'))
+
 
 			while len(self.writeHistory) > 200:
-				self.writeHistory.pop(0)
+				self.writeHistory.pop()
 
-			sleepTime = 1/self.settings["communicationFrequency"] - (time.time() - self._lastWriteAt)
+			sleepTime = 1/200 - (time.time() - self._lastWriteAt)
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
@@ -115,9 +129,8 @@ class Serial():
 				# [print(x) for x in txt.split(",")[1:3]]				
 				i = 0
 				parse = []
-				splited = txt.split(";")
-				self.homed = bool(int(splited[0]))
-				for vector in splited[1:2]:
+				splited = txt.split(";")				
+				for vector in splited[0:1]:
 					for x in vector.split(","):
 						try:
 							parse.append(round(float(x)))
@@ -126,6 +139,11 @@ class Serial():
 						
 					self.vectors[i] = (parse[0], parse[1])
 					i += 1
+					
+				if len(splited) > 2:
+					self.homed = bool(int(splited[2]))
+				else:
+					self.homed = True
 
 			except Exception as e: 
 				# print(e)
@@ -134,17 +152,23 @@ class Serial():
 							     
 
 	def start(self):
+		
+
 		if self._stopped:
-			try:
-				self._ser = serial.Serial('/dev/ttyACM0', self._baudRate)	
-			except: 
-				self._ser = serial.Serial('/dev/ttyUSB0', self._baudRate)	
+			for i in range(9):
+				try:
+					try:
+						self._ser = serial.Serial('/dev/ttyACM' + str(i), self._baudRate)
+					except:
+						self._ser = serial.Serial('/dev/ttyUSB' + str(i), self._baudRate)
+				except: continue
 			self._ser.flush()
 			self._readingCounter.start()
 			self._writingCounter.start()
 			self._stopped = False
 			Thread(target=self._reading, args=()).start()
 			Thread(target=self._writing, args=()).start()
+			self.error = False
 			print("Communication started.")
 		return self
 

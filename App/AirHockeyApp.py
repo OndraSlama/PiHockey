@@ -32,11 +32,13 @@ from Functions import getValueInXYdir
 import numpy as np
 import cv2
 import os
+import time
 from datetime import datetime
 from random import randint
 from functools import partial
 from pygame.math import Vector2
-import json
+# import json
+import pickle
 
 import os
 os.environ['KIVY_GL_BACKEND'] = 'gl'
@@ -205,6 +207,7 @@ class RootWidget(BoxLayout):
 	camera = Camera(settings.camera)
 	game = Game(camera, settings.game)
 	records = []
+	prevHomed = 0
 	dataCollector = DataCollector(game, camera, settings, "GameRecordings/")
 	serial = Serial(settings.motors)
 	
@@ -238,13 +241,13 @@ class RootWidget(BoxLayout):
 		self.showStatus("Oh, hi Mark!", 6)
 
 	def initializeSerial(self, *args):
+		self.motorsConnecting = True
 		try:
 			self.serial.start()
-			self.motorsConnected = True
 		except:
-			self.motorsConnected = False
 			self.openPopup("Serial connection not working", "Connection to motors not established.\nCheck if everything is turned on and try again or restart the table.", "Try again", lambda x: Clock.schedule_once(self.initializeSerial, 1))
-
+		self.motorsConnecting = False
+		
 	def initializeCamera(self, *args):
 		try:
 			self.camera.startCamera()
@@ -366,7 +369,7 @@ class RootWidget(BoxLayout):
 		if not index == 0: 
 			self.settings.motors["velocity"] = (3000/3) * index
 			self.settings.motors["acceleration"] = (30000/3) * index
-			self.settings.motors["pGain"] = 21			
+			self.settings.motors["deceleration"] = self.settings.motors["acceleration"] * 4
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
  #----------------------------- Camera screen management -----------------------------
@@ -430,15 +433,24 @@ class RootWidget(BoxLayout):
  
 	def updateRecording(self, *args):
 		if self.recording:
-			self.records.append([
-				datetime.now().strftime('%Y-%m-%d_%H-%M-%S'),
-				round(self.game.gameTime),
-				[round(self.game.strategy.puck.position.x), round(self.game.strategy.puck.position.y)],
-				[round(self.game.strategy.puck.velocity.x), round(self.game.strategy.puck.velocity.y)],
-				self.game.strategy.puck.trajectory.copy(),
-				[round(self.game.strategy.striker.position.x), round(self.game.strategy.striker.position.y)],
-				[round(self.game.strategy.striker.velocity.x), round(self.game.strategy.striker.velocity.y)]
-			])
+			recordRow = {}
+			recordRow["time"] = time.time()
+			try:
+				recordRow["frame"] = self.camera.frame.copy()
+			except:
+				recordRow["frame"] = None
+			recordRow["p2u"] = self.camera.p2uTranformMatrix
+			recordRow["u2p"] = self.camera.u2pTranformMatrix
+			recordRow["puckPos"] = [round(self.game.strategy.puck.position.x), round(self.game.strategy.puck.position.y)]
+			recordRow["puckVel"] = [round(self.game.strategy.puck.velocity.x), round(self.game.strategy.puck.velocity.y)]
+			recordRow["trajectory"] = self.game.strategy.puck.trajectory.copy()
+			recordRow["strikerPos"] = [round(self.game.strategy.striker.position.x), round(self.game.strategy.striker.position.y)]
+			recordRow["strikerVel"] = [round(self.game.strategy.striker.velocity.x), round(self.game.strategy.striker.velocity.y)]
+			recordRow["desiredPos"] = [round(self.game.strategy.striker.desiredPosition.x), round(self.game.strategy.striker.desiredPosition.y)]
+			recordRow["predictedPos"] = [round(self.game.strategy.predictedPosition.x), round(self.game.strategy.predictedPosition.y)]
+
+			self.records.append(recordRow)
+				
 
 	def saveRecord(self):
 		datetimestr = datetime.now().strftime('Recording_%Y-%m-%d_%H-%M-%S')
@@ -446,8 +458,8 @@ class RootWidget(BoxLayout):
 			os.mkdir("CameraRecordings")
 		except: pass
 
-		with open("CameraRecordings/" + datetimestr + '.txt', 'w') as outfile:
-			json.dump(self.records, outfile)
+		with open("CameraRecordings/" + datetimestr + '.obj', 'wb') as outfile:
+			pickle.dump(self.records, outfile)
 
 		print("recording saved")
 		self.records = []
@@ -619,7 +631,8 @@ class RootWidget(BoxLayout):
 		self.comFrequency = self.settings.motors["communicationFrequency"]
 		self.setVelocity = self.settings.motors["velocity"]
 		self.setAcceleration = self.settings.motors["acceleration"]
-		self.setPGain = self.settings.motors["pGain"]
+		self.setDeceleration = self.settings.motors["deceleration"]
+		# self.setPGain = self.settings.motors["pGain"]
 
 		# Strategy stuff
 		self.pixelDesiredPos = self.camera._toTuple(self.camera._unitsToPixels(self.desiredPos)) 
@@ -644,6 +657,13 @@ class RootWidget(BoxLayout):
  #----------------------------- Communication with arduino -----------------------------
 	def updateArduino(self, *args):
 	 #----------------------------- Read -----------------------------
+		if self.serial.error and not self.motorsConnecting:
+			self.motorsConnecting = True
+			try:
+				self.serial.start()
+			except: pass
+			self.motorsConnecting = False
+
 		if self.serial.readStatus() == "e1":
 			self.changeSettingsScreen("motorsSettingsScreen")
 			self.openPopup("End switch", "Safety end-switch has been activated. Either robot or someting else pressed it. Check robot table side and home motors to contine.", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
@@ -658,14 +678,20 @@ class RootWidget(BoxLayout):
 			self.sendAllSettings()
 			self.homed = False
 
+		if not self.prevHomed == self.serial.homed:
+			self.sendAllSettings()
+			self.prevHomed = self.serial.homed
+
+
 		# if self..readStatus() == "homed":
 		# 	self.showStatus("Homing finished")
 		# 	self.homed = True
 
 		self.game.setStriker(self.serial.vectors[0], self.serial.vectors[1])
 		if self.serial.goal == "gr": # goal on robot side
-			self.game.goal(1)
-			Clock.schedule_once(partial(self.serial.queueLine, "solenoid"), 1)
+			if not self.game.stopped:
+				self.game.goal(1)
+				Clock.schedule_once(partial(self.serial.queueLine, "solenoid"), 1)
 
 		if self.serial.goal == "gh": # goal on human side
 			self.game.goal(0)
@@ -687,12 +713,17 @@ class RootWidget(BoxLayout):
 		elif self.controlMode == 5:
 			self.serial.writeVector(self.desiredMot, "m")
 		
-		# print(self.desiredPos)
+	#----------------------------- Leds -----------------------------
+		if not self.prevLedsValue == int(self.ledsValue):
+			self.serial.queueLine("leds,"+str(int(self.ledsValue)))
+			self.prevLedsValue = int(self.ledsValue)
+			# print(self.desiredPos)
 	
 	def sendAllSettings(self, *args):
 		self.serial.queueLine("setmaxspeed,"+str(round(self.settings.motors['velocity'])))
 		self.serial.queueLine("setaccel,"+str(round(self.settings.motors['acceleration'])))
-		self.serial.queueLine("kpgain,"+str(round(self.settings.motors['pGain'])))
+		self.serial.queueLine("setdecel,"+str(round(self.settings.motors['deceleration'])))
+		self.serial.queueLine("kpgain,"+str(round(self.settings.motors["deceleration"]/(self.settings.motors['velocity']*2))))
 		self.serial.queueLine("preventwallhit,"+"1" if self.ids.cautionMode.isDown else "0")
 
 	def setFans(self, value, *args):
@@ -700,10 +731,14 @@ class RootWidget(BoxLayout):
 		self.fansOn = value
 		self.ids.fansToggle.state = "down" if value else "normal"
 	
-	def setLeds(self, value, *args):
-		self.serial.queueLine("leds,"+str(int(value)))
-		self.ledsOn = value
-		self.ids.ledsToggle.state = "down" if value else "normal"
+	def setLeds(self, value, *args):	
+		Animation.cancel_all(self, 'ledsValue')
+		if value < self.ledsValue:
+			anim = Animation(ledsValue=value, duration=.3, t="out_cubic")
+		else:
+			anim = Animation(ledsValue=value, duration=.7, t="out_cubic")
+		anim.start(self)
+		self.ids.ledsToggle.state = "down" if value > 0 else "normal"
  
  #----------------------------- Notifications & info -----------------------------
 	def openPopup(self, title = "Title", text = "Content", buttonText = "Dismiss", buttonAction = lambda x: print("nothing"), autoDismiss = True):
@@ -783,13 +818,13 @@ class RootWidget(BoxLayout):
 		self.game.start()	
 		self.dataCollector.start()
 		self.setFans(True)
-		self.setLeds(True)
+		self.setLeds(255)
 
 	def stopGame(self):
 		self.game.gameDone = False
 		self.game.stop()		
 		self.setFans(False)
-		self.setLeds(False)
+		# self.setLeds(False)
  
  #----------------------------- Helper functions -----------------------------
 	def setControlMode(self, mode, *args):

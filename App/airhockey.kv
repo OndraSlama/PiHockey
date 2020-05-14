@@ -59,7 +59,8 @@
 	desiredVel: [0,0]
 
 	# Table
-	ledsOn: False
+	ledsValue: 0
+	prevLedsValue: 0
 	fansOn: False
 
 	controlMode: 1
@@ -74,7 +75,7 @@
 	comFrequency: 0
 	setVelocity: 0
 	setAcceleration: 0
-	setPGain: 0
+	setDeceleration: 0
 	desiredPos: [0,0]
 	desiredVel: [0,0]
 	desiredMot: [0,0]
@@ -580,7 +581,7 @@
 											text: "Framerate"
 											textMagnitude: .4
 										SliderEditor:
-											text: "{:3d} fps".format(root.setCameraFps)
+											text: "{:3.0f} fps".format(root.setCameraFps)
 											limits: [20, 90]
 											value: root.settings.camera['fps']
 											step: 10
@@ -722,7 +723,9 @@
 													parameter: 'motors["velocity"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.game.strategy.maxSpeed = self.currentValue														
+														root.game.strategy.maxSpeed = self.currentValue	
+														root.game.strategy.gain = round(root.settings.motors["deceleration"]/(self.currentValue*2))
+														root.serial.queueLine("kpgain,"+str(round(root.settings.motors["deceleration"]/(self.currentValue*2))))
 														root.serial.queueLine("setmaxspeed,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 
@@ -738,7 +741,7 @@
 													text: "{:2.1f}k".format(root.setAcceleration/1000)
 													limits: [5000, 30000]
 													value: root.settings.motors['acceleration']
-													step: 5000
+													step: 1000
 													parameter: 'motors["acceleration"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
@@ -751,21 +754,38 @@
 												spacing: 10
 												RoundedLabel:
 													size_hint_x: .4
-													text: "P Gain"
+													text: "Deceleration"
 													textMagnitude: .4
 												SliderEditor:
-													id: pGainSlider
+													id: decelerationSlider
 													# textMagnitude: .37
-													text: "{:3.0f}".format(root.setPGain)
-													limits: [1, 30]
-													value: root.settings.motors['pGain']
-													step: 1
-													parameter: 'motors["pGain"]'
+													text: "{:2.1f}k".format(root.setDeceleration/1000)
+													limits: [10000, 120000]
+													value: root.settings.motors['deceleration']
+													step: 1000
+													parameter: 'motors["deceleration"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
-														root.game.strategy.gain = self.currentValue
-														root.serial.queueLine("kpgain,"+str(round(self.currentValue)))
+														root.game.strategy.deceleration = self.currentValue
+														root.game.strategy.gain = round(self.currentValue/(root.settings.motors["velocity"]*2))
+														root.serial.queueLine("kpgain,"+str(round(self.currentValue/(root.settings.motors["velocity"]*2))))
+														root.serial.queueLine("setdecel,"+str(round(self.currentValue)))
+													
 													colorTheme: root.colorTheme
+
+												# SliderEditor:
+												# 	id: pGainSlider
+												# 	# textMagnitude: .37
+												# 	text: "{:3.0f}".format(root.setPGain)
+												# 	limits: [1, 30]
+												# 	value: root.settings.motors['pGain']
+												# 	step: 1
+												# 	parameter: 'motors["pGain"]'
+												# 	on_currentValue:
+												# 		exec("robotSpeedDropdown.text = 'Custom'")
+												# 		root.game.strategy.gain = self.currentValue
+												# 		root.serial.queueLine("kpgain,"+str(round(self.currentValue)))
+												# 	colorTheme: root.colorTheme
 									BoxLayout:
 										size_hint_y: .4
 										spacing: 10
@@ -843,7 +863,7 @@
 										iconSource: "icons/light.png"
 										iconSize: .6
 										alpha: .7
-										on_release: root.setLeds(self.isDown)
+										on_release: root.setLeds(self.isDown * 255)
 
 									RoundedSwitchButton:
 										id: fansToggle
@@ -1686,7 +1706,7 @@
 					text: "Play again"
 					on_press: 
 						root.dismiss()
-						root.startGame()
+						app.root.startGame()
 					
 
 <ImagePopup>:
@@ -1704,7 +1724,7 @@
 	# 	size: root.size
 
 <HistoryPopup>:
-	size_hint: .4, .9
+	size_hint: .8, .9
 	auto_dismiss: True
 	background: "white.png"
 	title_color: 0, 0, 0, 1

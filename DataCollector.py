@@ -7,7 +7,7 @@ from threading import Thread
 from Constants import *
 from datetime import datetime
 from collections import OrderedDict
-from array2gif import write_gif
+# from array2gif import write_gif
 import cv2
 # from imgarray import save_array_img, load_array_img
 from PIL import Image

@@ -119,7 +119,7 @@ class FPSCounter():
 	def update(self):
 		if len(self.fpsHistory) > 2:
 			self.movingAverageFps = len(self.fpsHistory)/(time.time() - self.fpsHistory[0])
-		self.averageFps = self.ticks / (time.time() - self.startTime)
+		self.averageFps = 0 if time.time() - self.startTime == 0 else self.ticks / (time.time() - self.startTime)
 		
 		if time.time() - self.prevTime > 1:
 			self.reset = True

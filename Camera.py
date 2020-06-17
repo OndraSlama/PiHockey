@@ -1,9 +1,12 @@
 import cv2
 import numpy as np
 from threading import Thread
-from picamera.array import PiRGBArray
-from picamera import PiCamera
-from PiVideoStream import PiVideoStream
+try:
+	from picamera.array import PiRGBArray
+	from picamera import PiCamera
+	from PiVideoStream import PiVideoStream
+except:
+	pass
 from UniTools import Filter, FPSCounter, Repeater
 from pygame.math import Vector2
 from Constants import *

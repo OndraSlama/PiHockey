@@ -21,7 +21,6 @@ class Serial():
 
 		self.error = False
 
-
 		self._prevRead = ""
 		self._prevWrite = ""
 
@@ -74,7 +73,6 @@ class Serial():
 					_num = 0
 			except:
 				print("Error while decoding")
-
 			
 				
 			while len(self.readHistory) > 200:

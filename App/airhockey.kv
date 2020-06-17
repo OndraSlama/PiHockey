@@ -5,6 +5,7 @@
 #:import constants Constants
 #:import Joystick kivy.garden.joystick.Joystick
 #:import Window kivy.core.window.Window
+#:import myTime time
 
 # Default values ---------------------
 
@@ -1160,8 +1161,10 @@
 							# height: 70							
 							RoundedSwitchButton: 
 								text: "Record"
+								id: recordButton
 								on_release: 
 									root.recording = self.isDown
+									if self.isDown: root.recordingStartedAt = myTime.time()
 									if not self.isDown: root.saveRecord()
 							RoundedDropDown: 
 								size_hint_x: 1.5

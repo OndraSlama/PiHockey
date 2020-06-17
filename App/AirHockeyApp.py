@@ -51,6 +51,8 @@ class RootWidget(BoxLayout):
 		print("")
 	records = []
 	prevHomed = 0
+	recordingStartedAt = 0
+	prevFrame = None
 	dataCollector = DataCollector(game, camera, settings, "GameRecordings/")
 	serial = Serial(settings.motors)
 	
@@ -278,10 +280,13 @@ class RootWidget(BoxLayout):
 		if self.recording:
 			recordRow = {}
 			recordRow["time"] = time.time()
-			try:
-				recordRow["frame"] = self.camera.frame.copy()
-			except:
-				recordRow["frame"] = None
+			
+			recordRow["frame"] = None
+			# try:
+				# if not self.prevFrame == self.camera.frame:
+			# recordRow["frame"] = self.camera.frame.copy()
+					# self.prevFrame = self.camera.frame.copy()
+			# except: pass
 			recordRow["p2u"] = self.camera.p2uTranformMatrix
 			recordRow["u2p"] = self.camera.u2pTranformMatrix
 			recordRow["puckPos"] = toList(self.game.strategy.puck.position)
@@ -293,6 +298,12 @@ class RootWidget(BoxLayout):
 			recordRow["predictedPos"] = toList(self.game.strategy.predictedPosition)
 
 			self.records.append(recordRow)
+			maxTime = 30
+			if time.time() - self.recordingStartedAt > maxTime:
+				self.recording = False
+				self.ids.recordButton.state = "normal"
+				self.saveRecord()
+				self.openPopup("Recording stopped", "Recording stopped. Maximum recording time is set to " + str(maxTime) + " seconds.")
 				
 
 	def saveRecord(self):
@@ -341,7 +352,6 @@ class RootWidget(BoxLayout):
 	def changeMatch(self, timestamp):
 		for child in self.ids.gameSrollView.children:
 			child.disabled = False
-
 
 		# for child in self.ids.highlightsSrollView.children:
 		self.ids.highlightsSrollView.clear_widgets()
@@ -532,17 +542,18 @@ class RootWidget(BoxLayout):
 			except: pass
 			self.motorsConnecting = False
 
-		if self.serial.readStatus() == "e1":
+		status = self.serial.readStatus()
+		if status == "e1":
 			self.changeSettingsScreen("motorsSettingsScreen")
 			self.openPopup("End switch", "Safety end-switch has been activated. Either robot or someting else pressed it. Check robot table side and home motors to contine.", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
-		if self.serial.readStatus() == "e2":
+		if status == "e2":
 			self.changeSettingsScreen("motorsSettingsScreen")
 			self.openPopup("Driver error", "Error occured in one of the motor drivers. Most likely due to missed steps. Try lowering motors movement parameters and restart drivers to contine", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
-		if self.serial.readStatus() == "restarted":
+		if status == "restarted":
 			self.sendAllSettings()
 			self.homed = False
 
@@ -560,22 +571,29 @@ class RootWidget(BoxLayout):
 			if not self.game.stopped:
 				self.game.goal(1)
 				Clock.schedule_once(partial(self.serial.queueLine, "solenoid"), 1)
+				self.serial.queueLine("blink")
 
 		if self.serial.goal == "gh": # goal on human side
 			if not self.game.stopped:
 				self.game.goal(0)
-				
 		self.serial.goal = None
 
 	 #----------------------------- Write -----------------------------
 		if self.controlMode == 1:
 			if self.playing:
-				self.desiredPos = [*self.game.getDesiredPosition()]
+				if self.game.waitForPuck:
+					self.desiredPos = [300, 0]
+				else:
+					self.desiredPos = [*self.game.getDesiredPosition()]
 				self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 2:
 			if self.playing:
-				self.desiredVel = [*self.game.getDesiredVelocity()]
-				self.serial.writeVector(self.desiredVel, "v")
+				if self.game.waitForPuck:
+					self.desiredPos = [300, 0]
+					self.serial.writeVector(self.desiredPos, "p")
+				else:
+					self.desiredVel = [*self.game.getDesiredVelocity()]
+					self.serial.writeVector(self.desiredVel, "v")
 		elif self.controlMode == 3:
 			self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 4:
@@ -684,7 +702,7 @@ class RootWidget(BoxLayout):
 		if self.game.gameDone:
 			self.dataCollector.stop()
 			self.stopGame()
-			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
+			winner = "You win" if self.game.winner == 1 else "AI win" if self.game.winner == 0 else "Draw"
 			self.openWinnerPopup(winner)
 	
 	def startGame(self):

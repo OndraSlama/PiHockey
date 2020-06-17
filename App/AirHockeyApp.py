@@ -710,7 +710,6 @@ class RootWidget(BoxLayout):
 		if self.serial.goal == "gh": # goal on human side
 			if not self.game.stopped:
 				self.game.goal(0)
-
 		self.serial.goal = None
 
 	 #----------------------------- Write -----------------------------

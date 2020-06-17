@@ -1,6 +1,6 @@
 import serial
 import time
-from HelperClasses import FPSCounter
+from UniTools import FPSCounter
 from threading import Thread
 from datetime import datetime
 
@@ -20,7 +20,6 @@ class Serial():
 		self._writingQueue = []
 
 		self.error = False
-
 
 		self._prevRead = ""
 		self._prevWrite = ""
@@ -74,7 +73,6 @@ class Serial():
 					_num = 0
 			except:
 				print("Error while decoding")
-
 			
 				
 			while len(self.readHistory) > 200:

@@ -2,8 +2,7 @@
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 from threading import Thread
-from HelperClasses import FPSCounter
-from HelperClasses import Repeater
+from UniTools import FPSCounter, Repeater
 import cv2
 import time
  

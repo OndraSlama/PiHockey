@@ -1,6 +1,6 @@
 from Constants import *
 from Strategy import StrategyA, StrategyB, StrategyC, StrategyD
-from HelperClasses import FPSCounter, Repeater
+from UniTools import FPSCounter, Repeater
 from pygame.math import Vector2
 from threading import Thread
 import time
@@ -88,6 +88,10 @@ class Game():
 		print("Game started.")
 		while True:
 			stepTime = time.time() - self.lastStepAt
+
+			if not self.waitForPuck:
+				self.gameTime += time.time() - self.lastStepAt
+
 			self.lastStepAt = time.time()
 
 			self.step(stepTime)
@@ -98,9 +102,6 @@ class Game():
 			if sleepTime > 0:
 				time.sleep(sleepTime)
 
-			if not self.waitForPuck:
-				self.gameTime += time.time() - self.lastStepAt
-
 			if self.stopped:				
 				return
 
@@ -110,13 +111,15 @@ class Game():
 			if pos.x > STRIKER_RADIUS * 1.5:
 				self.waitForPuck = False
 			self.strategy.cameraInput(pos)
-			self.strategy.setStriker(self.strikersPosition[0], self.strikersVelocity[0])
-			self.strategy.setOpponentStriker(self.strikersPosition[1], self.strikersVelocity[1])
-		# try:
+
+		self.strategy.setStriker(self.strikersPosition[0], self.strikersVelocity[0])
+		self.strategy.setOpponentStriker(self.strikersPosition[1], self.strikersVelocity[1])
 		if not self.waitForPuck:
-			self.strategy.process(stepTime)	
-			# except Exception as e:
-			# 	print("Strategy: " + str(e))
+			try:
+				self.strategy.process(stepTime)	
+			except Exception as e:
+				# print("Strategy: " + str(e))
+				pass
 			self.frequencyCounter.tick()
 
 	def goal(self, side):

@@ -2,7 +2,7 @@
 import os
 import time
 import shutil
-from HelperClasses import FPSCounter
+from UniTools import FPSCounter
 from threading import Thread
 from Constants import *
 from datetime import datetime
@@ -125,23 +125,25 @@ class DataCollector():
 			self.gameData.accuracy = [self.game.shotOnGoals[i]/self.game.lostPucks[i] for i in range(2)]
 		except: pass
 
-		if self.game.maxShotSpeed[0] > self.gameData.humanTopSpeed[1]:
+		if self.game.maxShotSpeed[0] > self.gameData.humanTopSpeed[1] + 1:
 			self.gameData.humanTopSpeed = [gameTime, self.game.maxShotSpeed[0]]
+		print("Human speed ", self.gameData.humanTopSpeed[1], "at: ", self.gameData.humanTopSpeed[0])
 
-		if self.game.maxShotSpeed[1] > self.gameData.aiTopSpeed[1]:
+		if self.game.maxShotSpeed[1] > self.gameData.aiTopSpeed[1] + 1:
 			self.gameData.aiTopSpeed = [gameTime, self.game.maxShotSpeed[1]]
 
 
 		self._checkScore(gameTime)
 		if self.camera.frame is not None:
 			self.videoFrames[gameTime] = self.camera.frame.copy()
-		# print("Frame collected")
+		# print("Checked at ", gameTime)
 
 	def _checkScore(self, gameTime):
 		score = self.game.score.copy()
 		if not self.gameData.score == score: 
 			self.gameData.score = score.copy()
 			self.gameData.goals[gameTime] = score.copy()	
+			print("Score!", self.gameData.goals[gameTime])
 
 	def _saveRecord(self, gameData, videoFrames):
 		while self.saving:

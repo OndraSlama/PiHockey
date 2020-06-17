@@ -565,21 +565,21 @@ def oppositeSigns(x, y):
 
 def toList(vector, roundDigit = 0):
 	if isinstance(vector, Vector2):
-		return [round(vector.x, roundDigit), round(vector.y, roundDigit)]
+		return [int(vector.x) if roundDigit == 0 else round(vector.x, roundDigit), int(vector.y) if roundDigit == 0 else round(vector.y, roundDigit)]
 	else:
-		return [round(vector[0], roundDigit), round(vector[1], roundDigit)]
+		return [int(vector[0]) if roundDigit == 0 else round(vector[0], roundDigit), int(vector[1]) if roundDigit == 0 else round(vector[1], roundDigit)]
 
 def toTuple(vector, roundDigit = 0):
 	if isinstance(vector, Vector2):
-		return (round(vector.x, roundDigit), round(vector.y, roundDigit))
+		return (int(vector.x) if roundDigit == 0 else round(vector.x, roundDigit), int(vector.y) if roundDigit == 0 else round(vector.y, roundDigit))
 	else:
-		return (round(vector[0], roundDigit), round(vector[1], roundDigit))
+		return (int(vector[0]) if roundDigit == 0 else round(vector[0], roundDigit), int(vector[1]) if roundDigit == 0 else round(vector[1], roundDigit))
 
 def toVector(vector, roundDigit = 0):
 	if isinstance(vector, Vector2):
-		return Vector2(round(vector.x, roundDigit), round(vector.y, roundDigit))
+		return Vector2(int(vector.x) if roundDigit == 0 else round(vector.x, roundDigit), int(vector.y) if roundDigit == 0 else round(vector.y, roundDigit))
 	else:
-		return Vector2(round(vector[0], roundDigit), round(vector[1], roundDigit))
+		return Vector2(int(vector[0]) if roundDigit == 0 else round(vector[0], roundDigit), int(vector[1]) if roundDigit == 0 else round(vector[1], roundDigit))
 
 if __name__ == "__main__":
 	plotter = Plotter(linesNum=2)

@@ -27,7 +27,8 @@ from Game import Game
 from DataCollector import DataCollector
 from Serial import Serial
 from Constants import *
-from Functions import getValueInXYdir
+from Functions import getSpeedInXYdir
+from UniTools import toList, toTuple, toVector
 
 import numpy as np
 import cv2
@@ -132,7 +133,7 @@ class ControlField(Image):
 	def joystickControl(self, dir, magnitude):
 		app = App.get_running_app()
 		app.root.controlMode = 4
-		app.root.desiredVel = getValueInXYdir(dir[0], dir[1], magnitude * app.root.settings.motors["velocity"])
+		app.root.desiredVel = getSpeedInXYdir(dir[0], dir[1], magnitude * app.root.settings.motors["velocity"])
 		
 class ImageViewer(Image):
 	def on_touch_down(self, touch):
@@ -208,6 +209,8 @@ class RootWidget(BoxLayout):
 	game = Game(camera, settings.game)
 	records = []
 	prevHomed = 0
+	recordingStartedAt = 0
+	prevFrame = None
 	dataCollector = DataCollector(game, camera, settings, "GameRecordings/")
 	serial = Serial(settings.motors)
 	
@@ -369,7 +372,7 @@ class RootWidget(BoxLayout):
 		if not index == 0: 
 			self.settings.motors["velocity"] = (3000/3) * index
 			self.settings.motors["acceleration"] = (30000/3) * index
-			self.settings.motors["deceleration"] = self.settings.motors["acceleration"] * 4
+			self.settings.motors["deceleration"] = self.settings.motors["acceleration"] * 3
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
  #----------------------------- Camera screen management -----------------------------
@@ -435,21 +438,30 @@ class RootWidget(BoxLayout):
 		if self.recording:
 			recordRow = {}
 			recordRow["time"] = time.time()
-			try:
-				recordRow["frame"] = self.camera.frame.copy()
-			except:
-				recordRow["frame"] = None
+			
+			recordRow["frame"] = None
+			# try:
+				# if not self.prevFrame == self.camera.frame:
+			# recordRow["frame"] = self.camera.frame.copy()
+					# self.prevFrame = self.camera.frame.copy()
+			# except: pass
 			recordRow["p2u"] = self.camera.p2uTranformMatrix
 			recordRow["u2p"] = self.camera.u2pTranformMatrix
-			recordRow["puckPos"] = [round(self.game.strategy.puck.position.x), round(self.game.strategy.puck.position.y)]
-			recordRow["puckVel"] = [round(self.game.strategy.puck.velocity.x), round(self.game.strategy.puck.velocity.y)]
+			recordRow["puckPos"] = toList(self.game.strategy.puck.position)
+			recordRow["puckVel"] = toList(self.game.strategy.puck.velocity)
 			recordRow["trajectory"] = self.game.strategy.puck.trajectory.copy()
-			recordRow["strikerPos"] = [round(self.game.strategy.striker.position.x), round(self.game.strategy.striker.position.y)]
-			recordRow["strikerVel"] = [round(self.game.strategy.striker.velocity.x), round(self.game.strategy.striker.velocity.y)]
-			recordRow["desiredPos"] = [round(self.game.strategy.striker.desiredPosition.x), round(self.game.strategy.striker.desiredPosition.y)]
-			recordRow["predictedPos"] = [round(self.game.strategy.predictedPosition.x), round(self.game.strategy.predictedPosition.y)]
+			recordRow["strikerPos"] = toList(self.game.strategy.striker.position)
+			recordRow["strikerVel"] = toList(self.game.strategy.striker.velocity)
+			recordRow["desiredPos"] = toList(self.game.strategy.striker.desiredPosition)
+			recordRow["predictedPos"] = toList(self.game.strategy.predictedPosition)
 
 			self.records.append(recordRow)
+			maxTime = 30
+			if time.time() - self.recordingStartedAt > maxTime:
+				self.recording = False
+				self.ids.recordButton.state = "normal"
+				self.saveRecord()
+				self.openPopup("Recording stopped", "Recording stopped. Maximum recording time is set to " + str(maxTime) + " seconds.")
 				
 
 	def saveRecord(self):
@@ -497,7 +509,6 @@ class RootWidget(BoxLayout):
 	def changeMatch(self, timestamp):
 		for child in self.ids.gameSrollView.children:
 			child.disabled = False
-
 
 		# for child in self.ids.highlightsSrollView.children:
 		self.ids.highlightsSrollView.clear_widgets()
@@ -598,9 +609,10 @@ class RootWidget(BoxLayout):
 		self.normalizedColorToDetect = [self.colorToDetect[0]/180,self.colorToDetect[1]/255,self.colorToDetect[2]/255]
 		self.colorLimits = [self.camera.settings["lowerLimits"].tolist(), self.settings.camera["upperLimits"].tolist()]
 		self.whiteBalance = self.settings.camera["whiteBalance"]
-		self.puckPos = [round(self.camera.unitFilteredPuckPosition.x), round(self.camera.unitFilteredPuckPosition.y)]
+		self.puckPos = toList(self.camera.unitFilteredPuckPosition)
+
 		# print(self.puckPos)
-		self.puckPixelPos = [*self.camera._toTuple(self.camera._unitsToPixels(self.puckPos))]
+		self.puckPixelPos = toList(self.camera._unitsToPixels(self.puckPos))
 		self.trajectory = []
 		for line in self.game.strategy.puck.trajectory:
 			[self.trajectory.append(i) for i in [line.start.x, line.start.y, line.end.x, line.end.y]] 
@@ -664,17 +676,18 @@ class RootWidget(BoxLayout):
 			except: pass
 			self.motorsConnecting = False
 
-		if self.serial.readStatus() == "e1":
+		status = self.serial.readStatus()
+		if status == "e1":
 			self.changeSettingsScreen("motorsSettingsScreen")
 			self.openPopup("End switch", "Safety end-switch has been activated. Either robot or someting else pressed it. Check robot table side and home motors to contine.", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
-		if self.serial.readStatus() == "e2":
+		if status == "e2":
 			self.changeSettingsScreen("motorsSettingsScreen")
 			self.openPopup("Driver error", "Error occured in one of the motor drivers. Most likely due to missed steps. Try lowering motors movement parameters and restart drivers to contine", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
-		if self.serial.readStatus() == "restarted":
+		if status == "restarted":
 			self.sendAllSettings()
 			self.homed = False
 
@@ -692,20 +705,30 @@ class RootWidget(BoxLayout):
 			if not self.game.stopped:
 				self.game.goal(1)
 				Clock.schedule_once(partial(self.serial.queueLine, "solenoid"), 1)
+				self.serial.queueLine("blink")
 
 		if self.serial.goal == "gh": # goal on human side
-			self.game.goal(0)
+			if not self.game.stopped:
+				self.game.goal(0)
+
 		self.serial.goal = None
 
 	 #----------------------------- Write -----------------------------
 		if self.controlMode == 1:
 			if self.playing:
-				self.desiredPos = [*self.game.getDesiredPosition()]
+				if self.game.waitForPuck:
+					self.desiredPos = [300, 0]
+				else:
+					self.desiredPos = [*self.game.getDesiredPosition()]
 				self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 2:
 			if self.playing:
-				self.desiredVel = [*self.game.getDesiredVelocity()]
-				self.serial.writeVector(self.desiredVel, "v")
+				if self.game.waitForPuck:
+					self.desiredPos = [300, 0]
+					self.serial.writeVector(self.desiredPos, "p")
+				else:
+					self.desiredVel = [*self.game.getDesiredVelocity()]
+					self.serial.writeVector(self.desiredVel, "v")
 		elif self.controlMode == 3:
 			self.serial.writeVector(self.desiredPos, "p")
 		elif self.controlMode == 4:
@@ -719,11 +742,14 @@ class RootWidget(BoxLayout):
 			self.prevLedsValue = int(self.ledsValue)
 			# print(self.desiredPos)
 	
+	def getKpGain(self, maxSpeed, maxDec):
+		return round(maxDec/(maxSpeed*2))
+
 	def sendAllSettings(self, *args):
 		self.serial.queueLine("setmaxspeed,"+str(round(self.settings.motors['velocity'])))
 		self.serial.queueLine("setaccel,"+str(round(self.settings.motors['acceleration'])))
 		self.serial.queueLine("setdecel,"+str(round(self.settings.motors['deceleration'])))
-		self.serial.queueLine("kpgain,"+str(round(self.settings.motors["deceleration"]/(self.settings.motors['velocity']*2))))
+		self.serial.queueLine("kpgain,"+str(self.getKpGain(self.settings.motors['velocity'], self.settings.motors["deceleration"])))
 		self.serial.queueLine("preventwallhit,"+"1" if self.ids.cautionMode.isDown else "0")
 
 	def setFans(self, value, *args):
@@ -811,7 +837,7 @@ class RootWidget(BoxLayout):
 		if self.game.gameDone:
 			self.dataCollector.stop()
 			self.stopGame()
-			winner = "You win" if self.game.winner == 0 else "AI win" if self.game.winner == 1 else "Draw"
+			winner = "You win" if self.game.winner == 1 else "AI win" if self.game.winner == 0 else "Draw"
 			self.openWinnerPopup(winner)
 	
 	def startGame(self):

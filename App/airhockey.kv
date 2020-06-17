@@ -5,6 +5,7 @@
 #:import constants Constants
 #:import Joystick kivy.garden.joystick.Joystick
 #:import Window kivy.core.window.Window
+#:import myTime time
 
 # Default values ---------------------
 
@@ -718,14 +719,14 @@
 													# text: "{:2.0f}K{:1.0f}".format(root.setVelocity//1000,  round(root.setVelocity/1000 - root.setVelocity//1000, 1) * 10)
 													text: "{:2.1f}k".format(root.setVelocity/1000)
 													value: root.settings.motors['velocity']	
-													limits: [400, 3000]
+													limits: [400, 4000]
 													step: 200
 													parameter: 'motors["velocity"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
 														root.game.strategy.maxSpeed = self.currentValue	
-														root.game.strategy.gain = round(root.settings.motors["deceleration"]/(self.currentValue*2))
-														root.serial.queueLine("kpgain,"+str(round(root.settings.motors["deceleration"]/(self.currentValue*2))))
+														root.game.strategy.gain = root.getKpGain(self.currentValue, root.settings.motors["deceleration"])
+														root.serial.queueLine("kpgain,"+str(root.getKpGain(self.currentValue, root.settings.motors["deceleration"])))
 														root.serial.queueLine("setmaxspeed,"+str(round(self.currentValue)))
 													colorTheme: root.colorTheme
 
@@ -739,7 +740,7 @@
 													id: accelerationSlider
 													# textMagnitude: .37
 													text: "{:2.1f}k".format(root.setAcceleration/1000)
-													limits: [5000, 30000]
+													limits: [5000, 35000]
 													value: root.settings.motors['acceleration']
 													step: 1000
 													parameter: 'motors["acceleration"]'
@@ -760,15 +761,15 @@
 													id: decelerationSlider
 													# textMagnitude: .37
 													text: "{:2.1f}k".format(root.setDeceleration/1000)
-													limits: [10000, 120000]
+													limits: [10000, 110000]
 													value: root.settings.motors['deceleration']
 													step: 1000
 													parameter: 'motors["deceleration"]'
 													on_currentValue:
 														exec("robotSpeedDropdown.text = 'Custom'")
 														root.game.strategy.deceleration = self.currentValue
-														root.game.strategy.gain = round(self.currentValue/(root.settings.motors["velocity"]*2))
-														root.serial.queueLine("kpgain,"+str(round(self.currentValue/(root.settings.motors["velocity"]*2))))
+														root.game.strategy.gain = root.getKpGain(root.settings.motors["velocity"], self.currentValue)
+														root.serial.queueLine("kpgain,"+str(root.getKpGain(root.settings.motors["velocity"], self.currentValue)))
 														root.serial.queueLine("setdecel,"+str(round(self.currentValue)))
 													
 													colorTheme: root.colorTheme
@@ -1167,8 +1168,10 @@
 							# height: 70							
 							RoundedSwitchButton: 
 								text: "Record"
+								id: recordButton
 								on_release: 
 									root.recording = self.isDown
+									if self.isDown: root.recordingStartedAt = myTime.time()
 									if not self.isDown: root.saveRecord()
 							RoundedDropDown: 
 								size_hint_x: 1.5

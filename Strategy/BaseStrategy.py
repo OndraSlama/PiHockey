@@ -1,5 +1,5 @@
 from Strategy.StrategyStructs import *
-from UniTools import Filter, Line
+from UniTools import Filter, Line, oppositeSigns
 from Constants import *
 from numpy import sign
 from pygame.math import Vector2
@@ -20,6 +20,7 @@ class BaseStrategy():
 		# Striker Limits
 		self.maxSpeed = MAX_SPEED
 		self.acceleration = MAX_ACCELERATION
+		self.deceleration = MAX_DECELERATION
 		self.gain = KP_GAIN
 
 		# Puck
@@ -68,6 +69,8 @@ class BaseStrategy():
 
 		self.stepTick(stepTime)
 		self._process()
+		self.moveIfStuck()
+		
 		self.limitMovement()
 		self.calculateDesiredVelocity()
 		
@@ -94,8 +97,7 @@ class BaseStrategy():
 		self.calculateTrajectory()	
 
 
-	def initialCheck(self, pos):	
-
+	def initialCheck(self, pos):
 
 		currentStepVector = pos - self.puck.position
 		stepDistance = currentStepVector.magnitude()
@@ -219,7 +221,7 @@ class BaseStrategy():
 
 			# Filter velocity and normal vector
 			(r, fi) = self.puck.velocity.as_polar()
-			fi = self.angleFilter.filterData(fi, 360)
+			fi = self.angleFilter.filterData(fi, cyclic=360)
 			self.puck.velocity.from_polar((r, fi if fi <= 180 else fi - 360))
 			# print("-----")
 			# print(fi)
@@ -294,9 +296,30 @@ class BaseStrategy():
 		if self.striker.desiredPosition.x < XLIMIT: 
 			self.striker.desiredPosition.x = XLIMIT
 
-	def calculateDesiredVelocity(self):
-		self.striker.desiredVelocity = self.gain*(self.striker.desiredPosition - self.striker.position)
+		# Check if near corner
+		if self.striker.desiredPosition.x < XLIMIT + STRIKER_RADIUS:
+			if abs(self.striker.desiredPosition.y) > FIELD_HEIGHT/2 - (STRIKER_RADIUS + PUCK_RADIUS*2):
+				self.striker.desiredPosition.y = sign(self.striker.desiredPosition.y) * (FIELD_HEIGHT/2 - (STRIKER_RADIUS + PUCK_RADIUS*2))
 
+	def calculateDesiredVelocity(self):
+		# self.striker.desiredVelocity = self.gain*(self.striker.desiredPosition - self.striker.position)
+		# speedDiff = abs(self.striker.velocity.x) - abs(self.striker.velocity.y)
+
+		# maxSpeed = max(abs(self.striker.velocity.x), abs(self.striker.velocity.y), self.maxSpeed/10)
+		# xmag = max(abs(self.striker.velocity.x),self.maxSpeed/10)/maxSpeed
+		# ymag = max(abs(self.striker.velocity.y),self.maxSpeed/10)/maxSpeed
+		
+		# self.striker.desiredVelocity.x = xmag * self.gain*(self.striker.desiredPosition.x - self.striker.position.x)
+		# self.striker.desiredVelocity.y = ymag * self.gain*(self.striker.desiredPosition.y - self.striker.position.y)
+
+		self.striker.desiredVelocity.x = self.gain*(self.striker.desiredPosition.x - self.striker.position.x)
+		self.striker.desiredVelocity.y = self.gain*(self.striker.desiredPosition.y - self.striker.position.y)
+		
+		# if oppositeSigns(self.striker.desiredVelocity.x, self.striker.velocity.x):
+		# 	self.striker.desiredVelocity.x = 10 * self.gain*(self.striker.desiredPosition.x - self.striker.position.x)
+
+		# if oppositeSigns(self.striker.desiredVelocity.y, self.striker.velocity.y):		
+		# 	self.striker.desiredVelocity.y = 10 * self.gain*(self.striker.desiredPosition.y - self.striker.position.y)
 	# Checkers ------------------------------------------------------------------------------
 
 	def isOutsideLimits(self, pos):
@@ -331,22 +354,25 @@ class BaseStrategy():
 	def getPredictedPuckPosition(self, strikerPos = None, reserve=1.3):
 		if strikerPos is None: strikerPos = self.striker.desiredPosition
 		if self.puck.state == INACURATE:
+			self.predictedPosition = Vector2(self.puck.position)
 			return Vector2(self.puck.position)
 		if len(self.puck.trajectory) > 0:
 			try:
 				step = strikerPos - self.striker.position
 				dist = step.magnitude()
+
 				# Compute time, that will take striker to move to desired position
-				a = getValueInXYdir(step.x, step.y, self.acceleration).magnitude()
-				vm = getValueInXYdir(step.x, step.y, self.maxSpeed).magnitude()
-				v0 = sign(self.striker.velocity.dot(step)) * (step * self.striker.velocity.dot(step) / step.dot(step)).magnitude() #self.striker.speedMagnitude * step.normalize()
+				a = getSpeedInXYdir(step.x, step.y, self.acceleration).magnitude() # Acceleration in direction to desired pos
+				vm = getSpeedInXYdir(step.x, step.y, self.maxSpeed).magnitude() # Max velocity in direction to desired pos
+				v0 = sign(self.striker.velocity.dot(step)) * (step * self.striker.velocity.dot(step) / step.dot(step)).magnitude() # Projected current velocity in direction to desired pos 
+																																	#(how fast the striker is moving in the right direction)
 				
-				t1 = (vm - v0)/a	
-				d1 = 1/2 * a * t1**2 + v0*t1
-				if d1 > dist:
-					time = max((-v0 + (v0**2 + 2*a*dist)**.5)/a, (-v0 - (v0**2 + 2*a*dist)**.5)/a)
-				else:
-					time = t1 + (dist - d1)/vm
+				t1 = (vm - v0)/a # Time it would take for striker to accelerate to max speed in the direction to desired pos
+				d1 = 1/2 * a * t1**2 + v0*t1 # Distance the striker would cover in t1 time in direction to desiered pos
+				if d1 > dist: # if the "would be" distance is greater than actual distance to desired pos then: 
+					time = max((-v0 + (v0**2 + 2*a*dist)**.5)/a, (-v0 - (v0**2 + 2*a*dist)**.5)/a) # Calculate time to travel that distance with good old kinematic formula Δx=1/2at^2 + v0t
+				else: # else:
+					time = t1 + (dist - d1)/vm # Get the calculated t1 time and add time calculated as (residual distance)/maximum velocity
 
 				# time = dist/vm
 				vector = Vector2(self.puck.vector) * (self.puck.speedMagnitude * time)
@@ -357,7 +383,7 @@ class BaseStrategy():
 				self.predictedPosition = position
 				return position
 			except:
-				return Vector2(self.puck.position)
+				return Vector2(0,0)
 
 
 	# Line math ---------------
@@ -421,7 +447,9 @@ class BaseStrategy():
 	# Basic strategy functions used in Process method ---------------------------------------------
 
 	def defendGoalDefault(self):
-		if self.willBounce and self.puck.state == ACURATE and (self.puck.vector.x < -0.5 or (self.puck.vector.x < 0 and self.puck.trajectory[-1].end.x <= PUCK_RADIUS)) and not (self.puck.position.x > FIELD_WIDTH/2 and self.puck.speedMagnitude < 800):
+		if self.willBounce and self.puck.state == ACURATE\
+				and (self.puck.vector.x < -0.5 or (self.puck.vector.x < 0 and self.puck.trajectory[-1].end.x <= PUCK_RADIUS))\
+				and not (self.puck.position.x > FIELD_WIDTH*.6 and self.puck.speedMagnitude < 500):
 			if self.puck.trajectory[-1].end.x > XLIMIT + STRIKER_RADIUS:
 				fromPoint = self.puck.trajectory[-1].end
 			else:
@@ -442,7 +470,16 @@ class BaseStrategy():
 			self.setDesiredPosition(Vector2(desiredPosition))
 	
 	def defendGoalLastLine(self):
-		if self.striker.position.x < self.puck.position.x - PUCK_RADIUS < self.striker.position.x + PUCK_RADIUS + STRIKER_RADIUS:
+		if self.puck.position.x < self.striker.position.x and abs(self.puck.position.y) < GOAL_SPAN*.7: # if puck is behind striker and is infront of goal
+			self.setDesiredPosition(Vector2(self.striker.position.x, GOAL_SPAN/2 * -sign(self.puck.position.y)))
+			if abs(self.striker.position.y - GOAL_SPAN/2 * -sign(self.puck.position.y)) < CLOSE_DISTANCE or self.striker.position.x < XLIMIT + CLOSE_DISTANCE:
+				self.setDesiredPosition(Vector2(XLIMIT, GOAL_SPAN/2 * -sign(self.puck.position.y)))
+				if self.striker.position.x < XLIMIT + CLOSE_DISTANCE:
+					self.setDesiredPosition(Vector2(XLIMIT, self.puck.position.y))
+			
+			return
+
+		if self.striker.position.x < self.puck.position.x - PUCK_RADIUS < self.striker.position.x + PUCK_RADIUS + STRIKER_RADIUS: # if puck is just next to striker
 			blockY = self.puck.position.y
 		elif not self.goalLineIntersection == -10000 and self.puck.state == ACURATE and self.puck.vector.x < 0:
 			if self.puck.vector.x > -.7:

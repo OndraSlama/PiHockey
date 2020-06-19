@@ -38,7 +38,7 @@ EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
 Window.size = (938, 550)
-# Window.fullscreen = True
+Window.fullscreen = True
 
 
 #----------------------------- Root Widget -----------------------------
@@ -282,11 +282,13 @@ class RootWidget(BoxLayout):
 			recordRow["time"] = time.time()
 			
 			recordRow["frame"] = None
+
 			# try:
-				# if not self.prevFrame == self.camera.frame:
-			# recordRow["frame"] = self.camera.frame.copy()
-					# self.prevFrame = self.camera.frame.copy()
+			# 	if not self.prevFrame == self.camera.frame:
+			recordRow["frame"] = self.camera.frame.copy()
+			# 		self.prevFrame = self.camera.frame.copy()
 			# except: pass
+
 			recordRow["p2u"] = self.camera.p2uTranformMatrix
 			recordRow["u2p"] = self.camera.u2pTranformMatrix
 			recordRow["puckPos"] = toList(self.game.strategy.puck.position)

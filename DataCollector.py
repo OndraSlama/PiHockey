@@ -127,7 +127,7 @@ class DataCollector():
 
 		if self.game.maxShotSpeed[0] > self.gameData.humanTopSpeed[1] + 1:
 			self.gameData.humanTopSpeed = [gameTime, self.game.maxShotSpeed[0]]
-		print("Human speed ", self.gameData.humanTopSpeed[1], "at: ", self.gameData.humanTopSpeed[0])
+		# print("Human speed ", self.gameData.humanTopSpeed[1], "at: ", self.gameData.humanTopSpeed[0])
 
 		if self.game.maxShotSpeed[1] > self.gameData.aiTopSpeed[1] + 1:
 			self.gameData.aiTopSpeed = [gameTime, self.game.maxShotSpeed[1]]

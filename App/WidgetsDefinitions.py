@@ -136,7 +136,7 @@ class ImageViewer(Image):
 class CircularInfoRange(Label):
 	def changePortion(self, portion):
 		Animation.cancel_all(self, 'portion')
-		anim = Animation(portion=portion, duration=0.5, t="out_back")
+		anim = Animation(portion=portion, duration=1, t="out_back")
 		anim.start(self)
 #----------------------------- Popups -----------------------------
 class CustomPopup(Popup):

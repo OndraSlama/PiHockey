@@ -1212,13 +1212,16 @@
 							iconXOff: -60
 							on_release: root.changeInfoScreen("statsInfoScreen")
 
-						# RoundedButton:
-						# 	posHint: 0
-						# 	pos_hint: {"x": 1, "y": self.posHint}	
-						# 	backgroundColor: sectionBackgroundColor					
-						# 	id: recordsInfoScreenButton
-						# 	text: "Records"
-						# 	on_release: root.changeInfoScreen("recordsInfoScreen")
+						RoundedButton:
+							posHint: 0
+							pos_hint: {"x": 1, "y": self.posHint}	
+							backgroundColor: sectionBackgroundColor					
+							id: aboutInfoScreenButton
+							iconSource: "icons/human.png"
+							iconSize: .5
+							iconXOff: -60
+							text: "    About"
+							on_release: root.changeInfoScreen("aboutInfoScreen")
 
 					ScreenManager:
 						id: infoScreenManager
@@ -1377,6 +1380,14 @@
 							difficulty: 3
 
 							winRatio: .5
+							games: 2
+							averageDuration: 0
+							wins: [0,0]
+							maxSpeed: [0, 0]
+							averageGoals: [0, 0]
+							averageShots: [0, 0]
+							averageControll: [0, 0]
+							averageAccuracy: [0, 0]
 
 							BoxLayout:
 								orientation: "vertical"
@@ -1415,44 +1426,213 @@
 
 									
 
-								BoxLayout:	
+								BoxLayout:
+									orientation: "vertical"
+									spacing: 10
 									BoxLayout:
-										orientation: "vertical"
+										size_hint_y: None
+										height: 40
 										Icon:
-											size_hint_y: .2
 											source: "icons/human.png"
-										Label:
-											text: "filler"
-
-									CircularInfoRange:	
-										id: winRatioCircle
-										colorTheme: root.colorTheme
-										font_size: self.height*0.2	
-										bothSides: True
-										text: "{:.0f} %".format(max(0, statsInfoScreen.winRatio*100))
-										portion: statsInfoScreen.winRatio	
-
-									BoxLayout:
-										orientation: "vertical"
 										Icon:
-											size_hint_y: .2
 											source: "icons/monitor.png"
-										Label:
-											text: "filler"
+
+									BoxLayout:	
+										spacing: 30
+										BoxLayout:
+											orientation: "vertical"
+											spacing: 5				
+
+											ComparisionRight:
+												size_hint_x: 1.26
+												title: "Wins"
+												text: "{:.0f}".format(max(0,statsInfoScreen.wins[1]))
+												portion: statsInfoScreen.wins[1]/max(1, statsInfoScreen.games)
+												colorTheme: [.5,.5,.5,1]
+											ComparisionRight:
+												size_hint_x: 1.07
+												title: "Max shot speed [m/s]"
+												text: "{:.1f}".format(max(0,statsInfoScreen.maxSpeed[1])/1000)
+												portion: statsInfoScreen.maxSpeed[1]/9000
+												colorTheme: [.5,.5,.5,1]
+											ComparisionRight:
+												title: "Average goals per match"
+												text: "{:.1f}".format(max(0,statsInfoScreen.averageGoals[1]))
+												portion: statsInfoScreen.averageGoals[1]/10
+												colorTheme: [.5,.5,.5,1]
+											ComparisionRight:
+												title: "Average shots on goal per match"
+												text: "{:.0f}".format(max(0,statsInfoScreen.averageShots[1]))
+												portion: statsInfoScreen.averageShots[1]/50
+												colorTheme: [.5,.5,.5,1]
+											ComparisionRight:
+												size_hint_x: 1.07
+												title: "Average puck control per match [minutes]"
+												text: "{:.1f}".format(max(0,statsInfoScreen.averageControll[1])/60)
+												portion: statsInfoScreen.averageControll[1]/max(1,statsInfoScreen.averageDuration)
+												colorTheme: [.5,.5,.5,1]
+											ComparisionRight:
+												size_hint_x: 1.26
+												title: "Average shot accuracy per match"
+												text: "{:.0f}%".format(max(0,statsInfoScreen.averageAccuracy[1])*100)
+												portion: statsInfoScreen.averageAccuracy[1]
+												colorTheme: [.5,.5,.5,1]
+
+										CircularInfoRange:	
+											id: winRatioCircle
+											# pos_hint: {'center_x': .5, 'center_y': .5}
+											colorTheme: root.colorTheme
+											font_size: self.height*0.2	
+											bothSides: True
+											text: "{:.0f} %".format(max(0, statsInfoScreen.winRatio*100))
+											portion: statsInfoScreen.winRatio	
+
+										BoxLayout:
+											orientation: "vertical"
+											spacing: 5											
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												size_hint_x: 1.26
+												title: "Wins"
+												text: "{:.0f}".format(max(0,statsInfoScreen.wins[0]))
+												portion: statsInfoScreen.wins[0]/max(1, statsInfoScreen.games)
+												colorTheme: root.colorTheme
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												size_hint_x: 1.07
+												title: "Max shot speed [m/s]"
+												text: "{:.1f}".format(max(0,statsInfoScreen.maxSpeed[0])/1000)
+												portion: statsInfoScreen.maxSpeed[0]/9000
+												colorTheme: root.colorTheme
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												title: "Average goals per match"
+												text: "{:.1f}".format(max(0,statsInfoScreen.averageGoals[0]))
+												portion: statsInfoScreen.averageGoals[0]/10
+												colorTheme: root.colorTheme
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												title: "Average shots on goal per match"
+												text: "{:.0f}".format(max(0,statsInfoScreen.averageShots[0]))
+												portion: statsInfoScreen.averageShots[0]/50
+												colorTheme: root.colorTheme
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												size_hint_x: 1.07
+												title: "Average puck control per match [minutes]"
+												text: "{:.1f}".format(max(0,statsInfoScreen.averageControll[0])/60)
+												portion: statsInfoScreen.averageControll[0]/max(1,statsInfoScreen.averageDuration)
+												colorTheme: root.colorTheme
+											ComparisionLeft:
+												pos_hint: {'right': 1, 'center_y': .5}
+												size_hint_x: 1.26
+												title: "Average shot accuracy per match"
+												text: "{:.0f}%".format(max(0,statsInfoScreen.averageAccuracy[0])*100)
+												portion: statsInfoScreen.averageAccuracy[0]
+												colorTheme: root.colorTheme
 													
 
 								
 
-			# ------------------------------------- Records screen --------------------------------------------
+			# ------------------------------------- About screen --------------------------------------------
 						SubScreen:
 							padding: 30
 							spacing: 30
-							id: recordsInfoScreen
-							name: "recordsInfoScreen"												
+							id: aboutInfoScreen
+							name: "aboutInfoScreen"												
 
 							BoxLayout: 
-								Label:
-									text: "In development"
+								padding: 10
+								spacing: 10
+								BoxLayout:
+									spacing: 5
+									orientation: "vertical"
+									size_hint_x: .4
+									padding: 10
+									Label:
+										size_hint_y: 2									
+										text_size: self.size
+										font_size: 14
+										halign: "center"
+										valign: "top"
+										text: "This project was designed, implemented, tweaked and tested by 2 handsome guys fully in their free time and completely for free. \nIt took approx 2 years of active developlemnt (read: slavery) to finish and it will take at least another 2 years for us to recover to our normal mental state. \n\nFor more info about the whole project, navigate to one of our websites, read our final theses (just kidding) or see following video showcasing the final version of Air Hockey Robot as of july 2020:"
+									Image:
+										source: "images/rickroll.png"
+								BoxLayout: 
+									# orientation: "vertical"
+									spacing: 10
+									SubSection:
+										padding: 10
+										spacing: 10
+										orientation: "vertical"
+										Label:
+											size_hint_y: None
+											height: 25
+											text_size: self.size
+											font_size: 16
+											halign: "center"
+											valign: "top"
+											text: "Dominik Jasek"
+										Image:
+											size_hint_y: None
+											height: 170
+											source: "images/dom.jpg"
+										Label:
+											size_hint_y: .7
+											text_size: self.size
+											font_size: 14
+											halign: "center"
+											valign: "top"
+											text: "'It doesn't matter which way you come to the target. All that matters is how sexy this way really is.'"
+										Label:
+											text_size: self.size
+											font_size: 14
+											halign: "center"
+											valign: "top"
+											text: "Expertise:\nHardware, stepper motors, controll, electronics, arduino, design, construction, leadership, everything basically."
+										Label:
+											size_hint_y: .5
+											text_size: self.size
+											font_size: 14
+											halign: "center"
+											valign: "center"
+											text: "On project since December 2018"
+									SubSection:
+										padding: 10
+										spacing: 10
+										orientation: "vertical"
+										Label:
+											size_hint_y: None
+											height: 25
+											text_size: self.size
+											font_size: 16
+											halign: "center"
+											valign: "top"
+											text: "Ondrej Slama"
+										Image:
+											size_hint_y: None
+											height: 170
+											source: "images/ja.jpg"
+										Label:
+											size_hint_y: .7
+											text_size: self.size
+											font_size: 14
+											halign: "center"
+											valign: "top"
+											text: "'All we have to decide is what to do with the time that is given to us...\nAnd I have decided poorly.'"
+										Label:
+											text_size: self.size
+											font_size: 14
+											halign: "center"
+											valign: "top"
+											text: "Expertise:\nJust a bit of programming, UI design & implementation, game strategy, puck detection, simulation software."
+										Label:
+											text_size: self.size
+											size_hint_y: .5
+											font_size: 14
+											halign: "center"
+											valign: "center"
+											text: "On project since September 2019"
 
 # ------------------------------------- Status panel --------------------------------------------
 
@@ -1670,8 +1850,11 @@
 	textMagnitude: .6
 	font_size: self.height*self.textMagnitude
 	colorTheme: [1, 1, 1, 1]
+	animationPortion: 1
 	portion: 1
 	bothSides: False
+	on_animationPortion:
+		root.animateValue(self, 'portion', animationPortion)
 	# lineWidthModificator: 0
 
 	canvas.before:
@@ -2069,23 +2252,27 @@
 			text: str(root.value)
 			portion: root.portion
 
-# ComparisionTuple section --------------------------------------------------------
+# Comparision section --------------------------------------------------------
 <ComparisionTuple@SubSection>:
 	title: "Title"
 	leftText: "5"
 	rightText: "6"
 	portions: [.5, 1]
 	colorTheme: [1,1,1,1]
+	on_portions:
+		left.changePortion(self.portions[0])
+		right.changePortion(self.portions[1])
 	# spacing: 10
 	# orientation: "vertical"
 	roundMagnitude: 1
 	CircularInfoRange:
+		id: left
 		textMagnitude: .45
 		size_hint: None, None
 		size: root.height, root.height
 		text: root.leftText
 		colorTheme: root.colorTheme
-		portion: root.portions[0]
+		# portion: root.portions[0]
 
 	RoundedLabel:
 		textMagnitude: .28
@@ -2098,12 +2285,68 @@
 	# BoxLayout:
 
 	CircularInfoRange:
+		id: right
 		textMagnitude: .45
 		size_hint: None, None
 		size: root.height, root.height
 		text: root.rightText
 		colorTheme: root.colorTheme
-		portion: root.portions[1]
+		# portion: root.portions[1]
+
+<ComparisionRight@SubSection>:
+	title: "Title"
+	text: "5"
+	portion: .5
+	colorTheme: [1,1,1,1]
+	roundMagnitude: 1
+	on_portion:
+		range.changePortion(self.portion)
+
+	RoundedLabel:
+		textMagnitude: .28
+		text: root.title
+		size_hint: None, None
+		size: root.width - root.height, root.height
+		pos_hint: {"center_y": .5}
+		backgroundColor: 0,0,0,0
+
+	CircularInfoRange:
+		id: range
+		textMagnitude: .45
+		size_hint: None, None
+		size: root.height, root.height
+		text: root.text
+		colorTheme: root.colorTheme
+		# portion: root.portion
+
+<ComparisionLeft@SubSection>:
+	title: "Title"
+	text: "5"
+	portion: .5
+	colorTheme: [1,1,1,1]
+	roundMagnitude: 1	
+	on_portion:
+		range.changePortion(self.portion)
+
+	CircularInfoRange:
+		id: range
+		textMagnitude: .45
+		size_hint: None, None
+		size: root.height, root.height
+		text: root.text
+		colorTheme: root.colorTheme
+		# portion: root.portion
+
+	RoundedLabel:
+		textMagnitude: .28
+		text: root.title
+		size_hint: None, None
+		size: root.width - root.height, root.height
+		pos_hint: {"center_y": .5}
+		backgroundColor: 0,0,0,0
+
+
+
 # Settings tuple --------------------------------------------------------
 <SettingsTuple@BoxLayout>:
 	spacing: 20

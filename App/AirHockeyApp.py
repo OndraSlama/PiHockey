@@ -38,7 +38,7 @@ EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
 Window.size = (938, 550)
-Window.fullscreen = True
+# Window.fullscreen = True
 
 
 #----------------------------- Root Widget -----------------------------
@@ -61,9 +61,9 @@ class RootWidget(BoxLayout):
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
-		self.changeScreen("settingsScreen") # Initial screen
+		self.changeScreen("infoScreen") # Initial screen
 		self.changeSettingsScreen("motorsSettingsScreen")
-		self.changeInfoScreen("matchesInfoScreen")
+		self.changeInfoScreen("aboutInfoScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
 
 		Clock.schedule_interval(self.updateValues, 1/10)
@@ -75,6 +75,7 @@ class RootWidget(BoxLayout):
 		self.settings.game["applyMaxTime"]  = True
 		Clock.schedule_once(self.initializeSerial, 1)
 		Clock.schedule_once(self.initializeCamera, 1)
+		# Clock.schedule_once(self.computeStatistics, 10)
 		Clock.schedule_once(self.sendAllSettings, 10)
 
 		# Clock.schedule_once(self.debug3, 20)
@@ -105,7 +106,7 @@ class RootWidget(BoxLayout):
  #----------------------------- Screen managers -----------------------------
 	def changeInfoScreen(self, nextScreen):
 		current = self.ids.infoScreenManager.current
-		screens = ["matchesInfoScreen", "statsInfoScreen"]
+		screens = ["matchesInfoScreen", "statsInfoScreen", "aboutInfoScreen"]
 		if screens.index(current) < screens.index(nextScreen):
 			direction = "left"
 		else:
@@ -164,6 +165,7 @@ class RootWidget(BoxLayout):
 
 		if screenName == "infoScreen":
 			self.dataCollector.loadRecords()
+			self.computeStatistics()
 		else:
 			self.dataCollector.reset()
 		
@@ -323,7 +325,7 @@ class RootWidget(BoxLayout):
  #----------------------------- Info screen management ----------------------------- 
 	def updateInfoScreen(self, *args):
 
-	#----------------------------- Match history -----------------------------
+  #----------------------------- Match history -----------------------------
 		if self.dataCollector.newData:
 			self.dataCollector.newData = False			
 			for game in self.dataCollector.loadedGames:
@@ -439,29 +441,62 @@ class RootWidget(BoxLayout):
 		# self.ids.matchesInfoScreen.timestamp = timestamp
 		# print(self.ids.matchesInfoScreen.timestamp)
 	
-	#----------------------------- Statistics -----------------------------
+  #----------------------------- Statistics -----------------------------
 	def computeStatistics(self):
 		src = self.ids.statsInfoScreen
 		games = self.dataCollector.stats.games[0:min(len(self.dataCollector.stats.games), src.lastGames)]
+		
 		wins = [0,0]
+		noGames = 0
+		averageDuration = 0
+		maxSpeed = [0, 0]
+		averageGoals = [0, 0]
+		averageShots = [0, 0]
+		averageControll = [0, 0]
+		averageAccuracy = [0, 0]
 		for game in games:
 			if game.difficulty == src.difficulty or src.difficulty == 0:
+				
+				noGames += 1
+
 				if game.score[0] > game.score[1]:
 					wins[0] += 1
 				if game.score[0] < game.score[1]:
 					wins[1] += 1
 
+				if game.aiTopSpeed[1] > maxSpeed[0]:
+					maxSpeed[0] = game.aiTopSpeed[1]
+				if game.humanTopSpeed[1] > maxSpeed[1]:
+					maxSpeed[1] = game.humanTopSpeed[1]
+
+				averageGoals = [sum(x) for x in zip(averageGoals, game.score)]
+				averageShots = [sum(x) for x in zip(averageShots, game.shotOnGoals)]
+				averageControll = [sum(x) for x in zip(averageControll, game.puckControl)]
+				averageAccuracy = [sum(x) for x in zip(averageAccuracy, game.accuracy)]
+				averageDuration += game.duration
+
+
 		wr = 0.5 if (wins[0] + wins[1]) == 0 else wins[0]/(wins[0] + wins[1])
-
-		Animation.cancel_all(src, 'winRatio')
-		anim = Animation(winRatio=wr, duration=1, t="out_back")
-		anim.start(src)
-
-		print("computing", wins[0] + wins[1])
-
+		averageDuration /= max(1,noGames)
+		averageGoals = [x/max(1, noGames) for x in averageGoals]
+		averageShots = [x/max(1, noGames) for x in averageShots]
+		averageControll = [x/max(1, noGames) for x in averageControll]
+		averageAccuracy = [x/max(1, noGames) for x in averageAccuracy]
+	
+		src.wins = wins
+		src.games = noGames
+		src.maxSpeed = maxSpeed
+		src.averageGoals = averageGoals
+		src.averageShots = averageShots
+		src.averageControll = averageControll
+		src.averageAccuracy = averageAccuracy
+		src.averageDuration = averageDuration
 		
+	
+		self.animateValue(src, 'winRatio', wr)	
 
-
+		# print("computing", wins[0] + wins[1])
+		
  #----------------------------- Values updation -----------------------------
 
 	def updateValues(self, *args):
@@ -729,10 +764,8 @@ class RootWidget(BoxLayout):
 	def setDesiredMot(self, vector, *args):
 		self.desiredMot = vector.copy()
 	def executeString(self, string, *args):
-		exec(string)
-	
-  #----------------------------- Others -----------------------------		
-	def startAnimation(self, parameter, value, duration, transition, widget):
+		exec(string)		
+	def animateValue(self, widget, parameter, value, duration = 1, transition = "out_back"):
 		Animation.cancel_all(widget, parameter)
 		anim = eval("Animation("+parameter+"=value, duration=duration, t='"+transition+"')")
 		anim.start(widget)

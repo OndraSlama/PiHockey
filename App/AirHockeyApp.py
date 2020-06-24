@@ -38,7 +38,7 @@ EventLoop.ensure_window()
 
 Window.clearcolor = (1, 1, 1, 1)
 Window.size = (938, 550)
-# Window.fullscreen = True
+Window.fullscreen = True
 
 
 #----------------------------- Root Widget -----------------------------
@@ -214,9 +214,19 @@ class RootWidget(BoxLayout):
 	def changeSpeed(self, index):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
-			self.settings.motors["velocity"] = (3000/3) * index
-			self.settings.motors["acceleration"] = (30000/3) * index
-			self.settings.motors["deceleration"] = self.settings.motors["acceleration"] * 3
+			if index == 3:				
+				self.settings.motors["velocity"] = 4000
+				self.settings.motors["acceleration"] = 35000
+				self.settings.motors["pGain"] = 13
+			if index == 2:				
+				self.settings.motors["velocity"] = 2600
+				self.settings.motors["acceleration"] = 25000
+				self.settings.motors["pGain"] = 18
+			if index == 1:				
+				self.settings.motors["velocity"] = 1000
+				self.settings.motors["acceleration"] = 10000
+				self.settings.motors["pGain"] = 23
+
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
  #----------------------------- Camera screen management -----------------------------
@@ -546,8 +556,8 @@ class RootWidget(BoxLayout):
 		self.comFrequency = self.settings.motors["communicationFrequency"]
 		self.setVelocity = self.settings.motors["velocity"]
 		self.setAcceleration = self.settings.motors["acceleration"]
-		self.setDeceleration = self.settings.motors["deceleration"]
-		# self.setPGain = self.settings.motors["pGain"]
+		# self.setDeceleration = self.settings.motors["deceleration"]
+		self.setPGain = self.settings.motors["pGain"]
 
 		# Strategy stuff
 		self.pixelDesiredPos = self.camera._toTuple(self.camera._unitsToPixels(self.desiredPos)) 
@@ -651,7 +661,8 @@ class RootWidget(BoxLayout):
 		self.serial.queueLine("setmaxspeed,"+str(round(self.settings.motors['velocity'])))
 		self.serial.queueLine("setaccel,"+str(round(self.settings.motors['acceleration'])))
 		self.serial.queueLine("setdecel,"+str(round(self.settings.motors['deceleration'])))
-		self.serial.queueLine("kpgain,"+str(self.getKpGain(self.settings.motors['velocity'], self.settings.motors["deceleration"])))
+		# self.serial.queueLine("kpgain,"+str(self.getKpGain(self.settings.motors['velocity'], self.settings.motors["deceleration"])))
+		self.serial.queueLine("kpgain,"+str(round(self.settings.motors['pGain'])))
 		self.serial.queueLine("preventwallhit,"+"1" if self.ids.cautionMode.isDown else "0")
 
 	def setFans(self, value, *args):

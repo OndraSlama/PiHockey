@@ -268,28 +268,32 @@ class Camera():
 				self.filteredMask = cv2.dilate(self.filteredMask, None, iterations=1)
 				filtered = cv2.bitwise_and(self.frame, self.frame, mask=self.filteredMask)
 				
-				cnts = cv2.findContours(self.filteredMask.copy(), cv2.RETR_EXTERNAL,
-				cv2.CHAIN_APPROX_SIMPLE)
-				cnts = imutils.grab_contours(cnts)
-				center = None
+				#----------------------------- DETECTION -----------------------------
+				try:
+					cnts = cv2.findContours(self.filteredMask.copy(), cv2.RETR_EXTERNAL,
+					cv2.CHAIN_APPROX_SIMPLE)
+					cnts = imutils.grab_contours(cnts)
+					center = None
 
-				# only proceed if at least one contour was found
-				if len(cnts) > 0:
-					# find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
-					c = max(cnts, key=cv2.contourArea)
-					((x, y), radius) = cv2.minEnclosingCircle(c)						
+					# only proceed if at least one contour was found
+					if len(cnts) > 0:
+						# find the largest contour in the mask, then use it to compute the minimum enclosing circle and centroid
+						c = max(cnts, key=cv2.contourArea)
+						((x, y), radius) = cv2.minEnclosingCircle(c)
 
-					# only proceed if the radius meets a minimum size
-					if radius > self.settings["limitPuckRadius"]:
-						self.detectingCounter.tick()
+						# only proceed if the radius meets a minimum size
+						if radius > self.settings["limitPuckRadius"]:
+							self.detectingCounter.tick()
 
-						pixelPos = Vector2(int(x), int(y))
-						unitPos = self._pixelsToUnits(pixelPos)
-						if self._isPuckInField(unitPos):		
-							self.pixelPuckPosition = pixelPos	
-							self.unitPuckPosition = unitPos
-							self.unitFilteredPuckPosition = self.filter.filterData(Vector2(self.unitPuckPosition[0], self.unitPuckPosition[1]))
-							self.newPosition = True
+							pixelPos = Vector2(int(x), int(y))
+							unitPos = self._pixelsToUnits(pixelPos)
+							if self._isPuckInField(unitPos):
+								self.pixelPuckPosition = pixelPos
+								self.unitPuckPosition = unitPos
+								self.unitFilteredPuckPosition = self.filter.filterData(Vector2(self.unitPuckPosition[0], self.unitPuckPosition[1]))
+								self.newPosition = True						
+				except:
+					print("Error during puck detection.")
 
 				
 				if not MAX_PERFORMANCE:

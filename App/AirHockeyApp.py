@@ -85,7 +85,7 @@ class RootWidget(BoxLayout):
 		Clock.schedule_interval(self.updateRecording, 1/100)
 
 		self.settings.game["applyMaxTime"]  = True
-		self.settings.motors["deceleration"] = 60000
+		self.settings.motors["deceleration"] = 100000
 
 		Clock.schedule_once(self.initializeSerial, 1)
 		Clock.schedule_once(self.initializeCamera, 1)
@@ -229,12 +229,12 @@ class RootWidget(BoxLayout):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
 			if index == 3:				
-				self.settings.motors["velocity"] = 3500
-				self.settings.motors["acceleration"] = 30000
-				self.settings.motors["pGain"] = 16
-			if index == 2:				
-				self.settings.motors["velocity"] = 2600
+				self.settings.motors["velocity"] = 2000
 				self.settings.motors["acceleration"] = 25000
+				self.settings.motors["pGain"] = 17
+			if index == 2:				
+				self.settings.motors["velocity"] = 1600
+				self.settings.motors["acceleration"] = 20000
 				self.settings.motors["pGain"] = 20
 			if index == 1:				
 				self.settings.motors["velocity"] = 1000

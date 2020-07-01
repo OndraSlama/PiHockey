@@ -41,13 +41,13 @@ class Settings():
 		self.camera["upperLimits"] = np.uint8([15, 255, 120+140])
 		self.camera["whiteBalance"] = [1.5, 1.5]
 		self.camera["filterConstants"] = [8, 2.2, 1.2]
-		self.camera["limitPuckRadius"] = 10
+		self.camera["limitPuckRadius"] = 4
 
 	def resetMotorsSettings(self):
 		self.motors["communicationFrequency"] = 200
 		self.motors["velocity"] = 2800
 		self.motors["acceleration"] = 25000
-		self.motors["deceleration"] = 60000
+		self.motors["deceleration"] = 100000
 		self.motors["pGain"] = 19		
 
 	def resetGameSettings(self):

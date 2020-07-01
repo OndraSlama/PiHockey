@@ -201,6 +201,8 @@
 								iconSource: "icons/play.png"
 								disabled: root.playing or not root.homed
 								on_release: 
+									app.root.serial.queueLine("home") if not root.homed else None
+									root.homing = True if not root.homed else root.homing
 									root.startGame()									
 									root.showStatus("Game started")
 

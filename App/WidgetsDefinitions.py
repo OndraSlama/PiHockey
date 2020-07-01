@@ -90,7 +90,7 @@ class ControlField(Image):
 			fieldPos = self.getFieldPos([touch.x,  touch.y])
 
 			app = App.get_running_app()
-			app.root.desiredPos = [max(XLIMIT, min(STRIKER_AREA_WIDTH, fieldPos[0])), max(-YLIMIT, min(YLIMIT,fieldPos[1])) ]
+			app.root.desiredPos = app.root.limitMovement([fieldPos[0],fieldPos[1]])
 		return super(ControlField, self).on_touch_move(touch) # propagate further
 
 	def on_touch_up(self, touch):

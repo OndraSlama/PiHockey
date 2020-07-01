@@ -3,8 +3,11 @@ import os
 
 def main():
 	## Initialize objects -------------
-	app = AirHockeyApp()
-	app.run()
+	try:
+		app = AirHockeyApp()
+		app.run()
+	except:
+		print("Internal disater occured... restart application.")
 	os._exit(1)
 
 if __name__ == "__main__":

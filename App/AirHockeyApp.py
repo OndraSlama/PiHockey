@@ -24,6 +24,7 @@ from Constants import *
 from UniTools import toList, toTuple, toVector
 
 import numpy as np
+from numpy import sign
 import cv2
 import os
 import time
@@ -61,7 +62,7 @@ class RootWidget(BoxLayout):
 	def __init__(self, **kwarks):
 		super(RootWidget, self).__init__(**kwarks)		
 		
-		self.changeScreen("infoScreen") # Initial screen
+		self.changeScreen("playScreen") # Initial screen
 		self.changeSettingsScreen("motorsSettingsScreen")
 		self.changeInfoScreen("aboutInfoScreen")
 		# self.ids.cameraScreen.dropDown = RoundedDropDown()
@@ -73,6 +74,8 @@ class RootWidget(BoxLayout):
 		Clock.schedule_interval(self.updateRecording, 1/100)
 
 		self.settings.game["applyMaxTime"]  = True
+		self.settings.motors["deceleration"] = 60000
+
 		Clock.schedule_once(self.initializeSerial, 1)
 		Clock.schedule_once(self.initializeCamera, 1)
 		# Clock.schedule_once(self.computeStatistics, 10)
@@ -215,17 +218,17 @@ class RootWidget(BoxLayout):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
 			if index == 3:				
-				self.settings.motors["velocity"] = 4000
-				self.settings.motors["acceleration"] = 35000
-				self.settings.motors["pGain"] = 13
+				self.settings.motors["velocity"] = 3500
+				self.settings.motors["acceleration"] = 30000
+				self.settings.motors["pGain"] = 16
 			if index == 2:				
 				self.settings.motors["velocity"] = 2600
 				self.settings.motors["acceleration"] = 25000
-				self.settings.motors["pGain"] = 18
+				self.settings.motors["pGain"] = 20
 			if index == 1:				
 				self.settings.motors["velocity"] = 1000
 				self.settings.motors["acceleration"] = 10000
-				self.settings.motors["pGain"] = 23
+				self.settings.motors["pGain"] = 25
 
 			Clock.schedule_once(partial(self.executeString, 'self.ids.robotSpeedDropdown.setIndex(' + str(index) + ')'), .25)
 
@@ -513,6 +516,7 @@ class RootWidget(BoxLayout):
 		# Debug
 		# print(self.serial._readingCounter.print())
 		# Camera values
+
 		self.cameraResolution = self.settings.camera["resolution"]
 		self.cameraFps = round(self.camera.counter.movingAverageFps)
 		self.setCameraFps = self.settings.camera["fps"]
@@ -592,7 +596,7 @@ class RootWidget(BoxLayout):
 		status = self.serial.readStatus()
 		if status == "e1":
 			self.changeSettingsScreen("motorsSettingsScreen")
-			self.openPopup("End switch", "Safety end-switch has been activated. Either robot or someting else pressed it. Check robot table side and home motors to contine.", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
+			self.openPopup("End switch", "Safety end-switch has been activated. Either robot or someting else pressed it. Check robot table side and home motors to continue.", "Go to settings", lambda *args: self.changeScreen("settingsScreen"))
 			self.homed = False
 
 		if status == "e2":
@@ -675,7 +679,7 @@ class RootWidget(BoxLayout):
 		if value < self.ledsValue:
 			anim = Animation(ledsValue=value, duration=.3, t="out_cubic")
 		else:
-			anim = Animation(ledsValue=value, duration=.7, t="out_cubic")
+			anim = Animation(ledsValue=value, duration=.5, t="out_cubic")
 		anim.start(self)
 		self.ids.ledsToggle.state = "down" if value > 0 else "normal"
  
@@ -752,8 +756,19 @@ class RootWidget(BoxLayout):
 			self.stopGame()
 			winner = "You win" if self.game.winner == 1 else "AI win" if self.game.winner == 0 else "Draw"
 			self.openWinnerPopup(winner)
+			self.setLeds(0)
+
+			interval = .4
+			Clock.schedule_once(partial(self.setLeds, 255), interval)
+			Clock.schedule_once(partial(self.setLeds, 0), 2 * interval)
+			Clock.schedule_once(partial(self.setLeds, 255), 3 * interval)
+			Clock.schedule_once(partial(self.setLeds, 0), 4 * interval)
+			Clock.schedule_once(partial(self.setLeds, 255), 5 * interval)
+			# Clock.schedule_once(partial(self.setLeds, 0), 6 * interval)
+			# Clock.schedule_once(partial(self.setLeds, 255), 7 * interval)
+			# Clock.schedule_once(partial(self.setLeds, 0), 1.8)
 	
-	def startGame(self):
+	def startGame(self):		
 		self.game.start()	
 		self.dataCollector.start()
 		self.setFans(True)
@@ -780,7 +795,22 @@ class RootWidget(BoxLayout):
 		Animation.cancel_all(widget, parameter)
 		anim = eval("Animation("+parameter+"=value, duration=duration, t='"+transition+"')")
 		anim.start(widget)
- 
+	def limitMovement(self, desiredPos):
+		if desiredPos[0] > STRIKER_AREA_WIDTH:
+			desiredPos[0] = STRIKER_AREA_WIDTH
+
+		if abs(desiredPos[1]) > YLIMIT:
+			desiredPos[1] = sign(desiredPos[1]) * YLIMIT
+
+		if desiredPos[0] < XLIMIT: 
+			desiredPos[0] = XLIMIT
+
+		# Check if near corner
+		if desiredPos[0] < CORNER_SAFEGUARD_X:
+			if abs(desiredPos[1]) > FIELD_HEIGHT/2 - CORNER_SAFEGUARD_Y:
+				desiredPos[1] = sign(desiredPos[1]) * (FIELD_HEIGHT/2 - (STRIKER_RADIUS + PUCK_RADIUS*2))
+
+		return [int(desiredPos[0]), int(desiredPos[1])]
  #----------------------------- Debug -----------------------------
 	def testMotors(self):
 		targetPositions = [

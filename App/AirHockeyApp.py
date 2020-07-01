@@ -821,6 +821,12 @@ class RootWidget(BoxLayout):
 			if abs(desiredPos[1]) > FIELD_HEIGHT/2 - CORNER_SAFEGUARD_Y:
 				desiredPos[1] = sign(desiredPos[1]) * (FIELD_HEIGHT/2 - (STRIKER_RADIUS + PUCK_RADIUS*2))
 
+
+		# Check if near goal
+		if GOAL_SPAN/2 - GOAL_CORNER_SAFEGUARD_Y < abs(desiredPos[1]) < GOAL_SPAN/2:
+			if desiredPos[0] < GOAL_CORNER_SAFEGUARD_X:
+				desiredPos[0] = GOAL_CORNER_SAFEGUARD_X
+
 		return [int(desiredPos[0]), int(desiredPos[1])]
  #----------------------------- Debug -----------------------------
 	def testMotors(self):

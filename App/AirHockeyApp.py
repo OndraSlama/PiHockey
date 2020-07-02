@@ -229,9 +229,9 @@ class RootWidget(BoxLayout):
 		self.settings.game["robotSpeed"] = index
 		if not index == 0: 
 			if index == 3:				
-				self.settings.motors["velocity"] = 2000
-				self.settings.motors["acceleration"] = 25000
-				self.settings.motors["pGain"] = 17
+				self.settings.motors["velocity"] = 2200
+				self.settings.motors["acceleration"] = 30000
+				self.settings.motors["pGain"] = 14
 			if index == 2:				
 				self.settings.motors["velocity"] = 1600
 				self.settings.motors["acceleration"] = 20000
@@ -311,7 +311,7 @@ class RootWidget(BoxLayout):
 
 			# try:
 			# 	if not self.prevFrame == self.camera.frame:
-			recordRow["frame"] = self.camera.frame.copy()
+			# recordRow["frame"] = self.camera.frame.copy()
 			# 		self.prevFrame = self.camera.frame.copy()
 			# except: pass
 

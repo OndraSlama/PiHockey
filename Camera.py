@@ -285,7 +285,7 @@ class Camera():
 						if radius > self.settings["limitPuckRadius"]:
 							self.detectingCounter.tick()
 
-							pixelPos = Vector2(int(x), int(y))
+							pixelPos = Vector2(int(x + 1), int(y + 3))
 							unitPos = self._pixelsToUnits(pixelPos)
 							if self._isPuckInField(unitPos):
 								self.pixelPuckPosition = pixelPos
@@ -328,7 +328,7 @@ class Camera():
 
 					# Show image
 					if SHOW_MASK and DETECT_PUCK:
-						cv2.imshow("Mask", mask)
+						cv2.imshow("Mask", self.mask)
 
 					if SHOW_FILTERED_MASK and DETECT_PUCK:
 						cv2.imshow("Filtered mask", self.filteredMask)
